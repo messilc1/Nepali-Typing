@@ -553,25 +553,23 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         {/* Text View Container */}
         <div
-          className={`w-full flex flex-wrap gap-x-3 gap-y-2 text-slate-400 dark:text-slate-600 font-normal transition-all ${getFontSizeClass()}`}
+          className={`w-full flex flex-wrap gap-x-3 gap-y-2 text-slate-400 dark:text-slate-500 font-normal transition-all ${getFontSizeClass()}`}
           style={getFontFamilyStyle()}
         >
           {targetWords.map((word, wordIdx) => {
             const isCurrent = wordIdx === currentWordIndex;
             const isTyped = wordIdx < currentWordIndex;
-            const typedWord = typedHistory[wordIdx];
+            const typedWord = typedHistory[wordIdx] || '';
 
             return (
               <span
                 key={wordIdx}
                 ref={isCurrent ? activeWordRef : null}
-                className={`relative px-1.5 py-0.5 rounded-lg transition-all ${
-                  isCurrent
-                    ? 'bg-blue-50 dark:bg-blue-950/60 ring-2 ring-blue-500/40 text-slate-800 dark:text-slate-100 font-medium'
-                    : isTyped
+                className={`relative px-0.5 py-0.5 transition-all ${
+                  isTyped
                     ? typedWord === word
-                      ? 'text-emerald-600 dark:text-emerald-400 font-normal'
-                      : 'text-rose-600 dark:text-rose-400 underline decoration-rose-500 decoration-2'
+                      ? 'text-blue-600 dark:text-blue-400 font-medium'
+                      : ''
                     : 'text-slate-400 dark:text-slate-500'
                 }`}
               >
@@ -580,12 +578,21 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
                   if (isCurrent) {
                     if (charIdx < typedInput.length) {
                       if (typedInput[charIdx] === char) {
-                        charClass = 'text-emerald-600 dark:text-emerald-400';
+                        charClass = 'text-blue-600 dark:text-blue-400 font-medium';
                       } else {
                         charClass = 'text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950 rounded px-0.5';
                       }
-                    } else if (charIdx === typedInput.length) {
-                      charClass = 'border-b-2 border-blue-600 dark:border-blue-400 animate-pulse';
+                    }
+                    // No highlight for active alphabet (charIdx === typedInput.length) or upcoming alphabets
+                  } else if (isTyped && typedWord !== word) {
+                    if (charIdx < typedWord.length) {
+                      if (typedWord[charIdx] === char) {
+                        charClass = 'text-blue-600 dark:text-blue-400 font-medium';
+                      } else {
+                        charClass = 'text-rose-600 dark:text-rose-400 underline decoration-rose-500 decoration-2';
+                      }
+                    } else {
+                      charClass = 'text-rose-400 dark:text-rose-600 opacity-60';
                     }
                   }
 
