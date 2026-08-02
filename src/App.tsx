@@ -8,10 +8,11 @@ import { ErrorAnalysisView } from './components/ErrorAnalysisView';
 import { PracticeMode } from './components/PracticeMode';
 import { LegalPackView } from './components/LegalPackView';
 import { HistoryAnalytics } from './components/HistoryAnalytics';
+import { CertificationView } from './components/CertificationView';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
 
-import { TestSettings, TestResult, UserStats, KeyStats } from './types';
+import { TestSettings, TestResult, UserStats, KeyStats, NavigationTab } from './types';
 import { applyGlobalNepaliFont, getStoredNepaliFont } from './utils/fonts';
 import {
   NEPALI_WORDS_EASY,
@@ -76,7 +77,7 @@ export default function App() {
   });
 
   // Navigation & Modals State
-  const [activeTab, setActiveTab] = useState<'test' | 'practice' | 'legal' | 'heatmap' | 'history'>('test');
+  const [activeTab, setActiveTab] = useState<NavigationTab>('test');
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showCustomParagraphModal, setShowCustomParagraphModal] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -345,26 +346,20 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'heatmap' && (
-          <div className="space-y-8">
-            <ErrorAnalysisView
-              history={userStats.history}
-              onStartTargetedPractice={handleLaunchTargetedPractice}
-            />
-            <OnScreenKeyboard
-              keyStatsMap={keyStatsMap}
-            />
-          </div>
-        )}
-
-        {activeTab === 'history' && (
+        {(activeTab === 'analytics' || (activeTab as string) === 'history' || (activeTab as string) === 'heatmap') && (
           <HistoryAnalytics
             userStats={userStats}
+            keyStatsMap={keyStatsMap}
+            onStartTargetedPractice={handleLaunchTargetedPractice}
             onClearHistory={() => {
               setUserStats(INITIAL_USER_STATS);
               localStorage.removeItem('nepali_typing_user_stats');
             }}
           />
+        )}
+
+        {activeTab === 'certification' && (
+          <CertificationView />
         )}
 
       </main>

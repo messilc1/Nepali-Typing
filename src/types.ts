@@ -1,4 +1,53 @@
+export type NavigationTab = 'test' | 'practice' | 'legal' | 'analytics' | 'certification';
+
 export type LanguageMode = 'nepali' | 'english';
+
+export interface CertificationUser {
+  googleId?: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+  mobileNumber: string;
+  permanentAddress: string;
+  district: string;
+  province: string;
+  country: string;
+  idType: 'Citizenship Certificate' | 'National ID Card' | 'Passport' | 'Driving Licence' | 'Other';
+  idNumber: string;
+  registeredAt: number;
+  isRegistered: boolean;
+}
+
+export interface CertificationTestScore {
+  testIndex: number; // 1, 2, 3
+  testName: string;
+  netWpm: number;
+  grossWpm: number;
+  accuracy: number;
+  consistency: number;
+  durationSeconds: number;
+  mistakes: number;
+  backspaces: number;
+  totalWords: number;
+  totalCharacters: number;
+  completedAt: number;
+}
+
+export interface CertificationAttempt {
+  id: string; // e.g. CERT-NTP-2026-X8921
+  user: CertificationUser;
+  startedAt: number;
+  completedAt?: number;
+  status: 'in_progress' | 'completed' | 'invalidated';
+  invalidationReason?: string;
+  tabSwitchViolations: number;
+  scores: CertificationTestScore[];
+  avgNetWpm?: number;
+  avgGrossWpm?: number;
+  avgAccuracy?: number;
+  avgConsistency?: number;
+  certificateGrade?: 'Excellent' | 'Good' | 'Participation' | 'Failed';
+}
 
 export type TestType = 'time' | 'words' | 'custom' | 'paragraph' | 'legal' | 'quote';
 

@@ -4,13 +4,11 @@ import {
   Trophy,
   Clock,
   Target,
-  Calendar,
   Download,
   Trash2,
   Activity,
   Flame,
   Zap,
-  Filter,
   Search,
   AlertTriangle,
   Scale,
@@ -18,21 +16,34 @@ import {
   Layers,
   FileText,
   TrendingUp,
-  CheckCircle2
+  CheckCircle2,
+  Keyboard,
+  Award,
+  ShieldCheck,
+  ChevronRight
 } from 'lucide-react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from 'recharts';
-import { UserStats, TestResult } from '../types';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { UserStats, KeyStats, TestResult } from '../types';
+import { OnScreenKeyboard } from './OnScreenKeyboard';
+import { ErrorAnalysisView } from './ErrorAnalysisView';
 
 interface HistoryAnalyticsProps {
   userStats: UserStats;
+  keyStatsMap?: Record<string, KeyStats>;
   onClearHistory: () => void;
+  onStartTargetedPractice?: (items: string[]) => void;
 }
 
 export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
   userStats,
-  onClearHistory
+  keyStatsMap = {},
+  onClearHistory,
+  onStartTargetedPractice = () => {}
 }) => {
-  // Navigation & View Filters State
+  // Navigation Sub-tab State
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'performance' | 'heatmap' | 'errors' | 'history' | 'achievements' | 'all'>('all');
+
+  // View Filters State
   const [trendTimeframe, setTrendTimeframe] = useState<'all' | 'daily' | 'weekly' | 'monthly'>('all');
   const [filterTestType, setFilterTestType] = useState<string>('all');
   const [filterDateRange, setFilterDateRange] = useState<string>('all');
@@ -332,6 +343,93 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Dashboard Sub-navigation Tabs */}
+      <div className="flex items-center justify-start gap-1 p-1.5 bg-slate-200/70 dark:bg-slate-800/80 rounded-2xl border border-slate-300/60 dark:border-slate-700/60 overflow-x-auto no-scrollbar text-xs font-extrabold sticky top-16 z-20 backdrop-blur-md shadow-sm">
+        <button
+          onClick={() => setActiveSubTab('all')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'all'
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-blue-500" />
+          <span>Complete Dashboard</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('overview')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'overview'
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Trophy className="w-4 h-4 text-amber-500" />
+          <span>Overview</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('performance')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'performance'
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-indigo-500" />
+          <span>Progress & Trends</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('heatmap')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'heatmap'
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Keyboard className="w-4 h-4 text-purple-500" />
+          <span>Keyboard Heatmap</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('errors')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'errors'
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4 text-rose-500" />
+          <span>Error Analysis</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('history')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'history'
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <FileText className="w-4 h-4 text-slate-500" />
+          <span>Test History</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('achievements')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeSubTab === 'achievements'
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Award className="w-4 h-4 text-amber-500" />
+          <span>Achievements</span>
+        </button>
       </div>
 
       {/* ========================================== */}
@@ -639,172 +737,266 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
       </div>
 
       {/* ========================================== */}
-      {/* 4. COMPREHENSIVE TEST HISTORY LOG TABLE    */}
+      {/* 4. KEYBOARD HEATMAP SECTION               */}
       {/* ========================================== */}
-      <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden space-y-4 p-6 sm:p-8">
-        
-        {/* Table Title & Filter Controls Header */}
-        <div className="flex flex-col space-y-4 border-b border-slate-100 dark:border-slate-700 pb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                <span>Detailed Test History Log ({filteredHistory.length})</span>
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Automatically recorded performance history
-              </p>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search history by passage or mode..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Filter Options Group */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs font-semibold">
-            
-            {/* Test Type Filter */}
-            <div>
-              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Test Type:</label>
-              <select
-                value={filterTestType}
-                onChange={(e) => setFilterTestType(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
-              >
-                <option value="all">All Test Types</option>
-                <option value="time">Timed Speed Test</option>
-                <option value="words">Word Count Test</option>
-                <option value="legal">Legal Pack / Lok Sewa</option>
-                <option value="custom">Custom Paragraph</option>
-                <option value="quote">Quote Test</option>
-              </select>
-            </div>
-
-            {/* Language Filter */}
-            <div>
-              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Language:</label>
-              <select
-                value={filterLanguage}
-                onChange={(e) => setFilterLanguage(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
-              >
-                <option value="all">All Languages</option>
-                <option value="nepali">🇳🇵 Nepali Unicode</option>
-                <option value="english">🇬🇧 English</option>
-              </select>
-            </div>
-
-            {/* Date Range Filter */}
-            <div>
-              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Date Range:</label>
-              <select
-                value={filterDateRange}
-                onChange={(e) => setFilterDateRange(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
-              >
-                <option value="all">All Time</option>
-                <option value="today">Today Only</option>
-                <option value="7days">Last 7 Days</option>
-                <option value="30days">Last 30 Days</option>
-              </select>
-            </div>
-
-            {/* Duration Filter */}
-            <div>
-              <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Duration:</label>
-              <select
-                value={filterDuration}
-                onChange={(e) => setFilterDuration(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
-              >
-                <option value="all">All Durations</option>
-                <option value="short">Short (&le; 30s)</option>
-                <option value="medium">Medium (30s - 60s)</option>
-                <option value="long">Long (&gt; 60s)</option>
-              </select>
-            </div>
-
-          </div>
+      {(activeSubTab === 'all' || activeSubTab === 'heatmap') && (
+        <div className="space-y-4 pt-2">
+          <OnScreenKeyboard keyStatsMap={keyStatsMap} />
         </div>
+      )}
 
-        {/* History Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
-              <tr>
-                <th className="px-4 py-3">Date & Time</th>
-                <th className="px-4 py-3">Type / Passage</th>
-                <th className="px-4 py-3">Lang</th>
-                <th className="px-4 py-3">Net WPM</th>
-                <th className="px-4 py-3">Gross</th>
-                <th className="px-4 py-3">Accuracy</th>
-                <th className="px-4 py-3">Rhythm</th>
-                <th className="px-4 py-3">Errors</th>
-                <th className="px-4 py-3">Time</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {filteredHistory.map(item => (
-                <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
-                  <td className="px-4 py-3.5 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
-                    {new Date(item.timestamp).toLocaleString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="font-bold text-slate-900 dark:text-slate-100 truncate max-w-[14rem]">
-                      {item.categoryOrTitle || item.testType}
-                    </div>
-                    <div className="text-[10px] text-slate-400 truncate max-w-[14rem]">
-                      {item.sampleText}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 uppercase font-bold text-blue-600 dark:text-blue-400">
-                    {item.language === 'nepali' ? '🇳🇵' : '🇬🇧'}
-                  </td>
-                  <td className="px-4 py-3.5 font-black text-sm text-blue-600 dark:text-blue-300">
-                    {item.netWpm}
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-500 font-medium">
-                    {item.grossWpm}
-                  </td>
-                  <td className={`px-4 py-3.5 font-bold ${item.accuracy >= 95 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {item.accuracy}%
-                  </td>
-                  <td className="px-4 py-3.5 text-purple-600 font-semibold">
-                    {item.consistencyPercent || 85}%
-                  </td>
-                  <td className="px-4 py-3.5 text-rose-600 font-bold">
-                    {item.mistakesCount}
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-500 font-medium whitespace-nowrap">
-                    {item.elapsedSeconds}s
-                  </td>
+      {/* ========================================== */}
+      {/* 5. ERROR ANALYSIS SECTION                  */}
+      {/* ========================================== */}
+      {(activeSubTab === 'all' || activeSubTab === 'errors') && (
+        <div className="space-y-4 pt-2">
+          <ErrorAnalysisView
+            history={history}
+            onStartTargetedPractice={onStartTargetedPractice}
+          />
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* 6. COMPREHENSIVE TEST HISTORY LOG TABLE    */}
+      {/* ========================================== */}
+      {(activeSubTab === 'all' || activeSubTab === 'history') && (
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden space-y-4 p-6 sm:p-8">
+          
+          {/* Table Title & Filter Controls Header */}
+          <div className="flex flex-col space-y-4 border-b border-slate-100 dark:border-slate-700 pb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <span>Detailed Test History Log ({filteredHistory.length})</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Automatically recorded performance history
+                </p>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search history by passage or mode..."
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Filter Options Group */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs font-semibold">
+              
+              {/* Test Type Filter */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Test Type:</label>
+                <select
+                  value={filterTestType}
+                  onChange={(e) => setFilterTestType(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
+                >
+                  <option value="all">All Test Types</option>
+                  <option value="time">Timed Speed Test</option>
+                  <option value="words">Word Count Test</option>
+                  <option value="legal">Legal Pack / Lok Sewa</option>
+                  <option value="custom">Custom Paragraph</option>
+                  <option value="quote">Quote Test</option>
+                </select>
+              </div>
+
+              {/* Language Filter */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Language:</label>
+                <select
+                  value={filterLanguage}
+                  onChange={(e) => setFilterLanguage(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
+                >
+                  <option value="all">All Languages</option>
+                  <option value="nepali">🇳🇵 Nepali Unicode</option>
+                  <option value="english">🇬🇧 English</option>
+                </select>
+              </div>
+
+              {/* Date Range Filter */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Date Range:</label>
+                <select
+                  value={filterDateRange}
+                  onChange={(e) => setFilterDateRange(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today Only</option>
+                  <option value="7days">Last 7 Days</option>
+                  <option value="30days">Last 30 Days</option>
+                </select>
+              </div>
+
+              {/* Duration Filter */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Duration:</label>
+                <select
+                  value={filterDuration}
+                  onChange={(e) => setFilterDuration(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
+                >
+                  <option value="all">All Durations</option>
+                  <option value="short">Short (&le; 30s)</option>
+                  <option value="medium">Medium (30s - 60s)</option>
+                  <option value="long">Long (&gt; 60s)</option>
+                </select>
+              </div>
+
+            </div>
+          </div>
+
+          {/* History Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">
+                <tr>
+                  <th className="px-4 py-3">Date & Time</th>
+                  <th className="px-4 py-3">Type / Passage</th>
+                  <th className="px-4 py-3">Lang</th>
+                  <th className="px-4 py-3">Net WPM</th>
+                  <th className="px-4 py-3">Gross</th>
+                  <th className="px-4 py-3">Accuracy</th>
+                  <th className="px-4 py-3">Rhythm</th>
+                  <th className="px-4 py-3">Errors</th>
+                  <th className="px-4 py-3">Time</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {filteredHistory.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/30 transition-colors">
+                    <td className="px-4 py-3.5 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                      {new Date(item.timestamp).toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="font-bold text-slate-900 dark:text-slate-100 truncate max-w-[14rem]">
+                        {item.categoryOrTitle || item.testType}
+                      </div>
+                      <div className="text-[10px] text-slate-400 truncate max-w-[14rem]">
+                        {item.sampleText}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 uppercase font-bold text-blue-600 dark:text-blue-400">
+                      {item.language === 'nepali' ? '🇳🇵' : '🇬🇧'}
+                    </td>
+                    <td className="px-4 py-3.5 font-black text-sm text-blue-600 dark:text-blue-300">
+                      {item.netWpm}
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-500 font-medium">
+                      {item.grossWpm}
+                    </td>
+                    <td className={`px-4 py-3.5 font-bold ${item.accuracy >= 95 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {item.accuracy}%
+                    </td>
+                    <td className="px-4 py-3.5 text-purple-600 font-semibold">
+                      {item.consistencyPercent || 85}%
+                    </td>
+                    <td className="px-4 py-3.5 text-rose-600 font-bold">
+                      {item.mistakesCount}
+                    </td>
+                    <td className="px-4 py-3.5 text-slate-500 font-medium whitespace-nowrap">
+                      {item.elapsedSeconds}s
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-          {filteredHistory.length === 0 && (
-            <div className="p-10 text-center text-slate-400 text-sm font-medium">
-              No typing history records match your selected filters.
-            </div>
-          )}
+            {filteredHistory.length === 0 && (
+              <div className="p-10 text-center text-slate-400 text-sm font-medium">
+                No typing history records match your selected filters.
+              </div>
+            )}
+          </div>
+
         </div>
+      )}
 
-      </div>
+      {/* ========================================== */}
+      {/* 7. ACHIEVEMENTS & MILESTONES               */}
+      {/* ========================================== */}
+      {(activeSubTab === 'all' || activeSubTab === 'achievements') && (
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 sm:p-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-amber-500" />
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-800 dark:text-slate-100">
+                Typing Achievements & Mastery Badges
+              </h3>
+            </div>
+            <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-800 px-3 py-1 rounded-full">
+              {userStats.currentStreakDays} Day Streak
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+            
+            {/* Badge 1 */}
+            <div className={`p-4 rounded-2xl border flex items-center gap-3 transition-all ${highestWpm >= 30 ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-60'}`}>
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 font-black text-xl flex items-center justify-center shrink-0 shadow-sm">
+                🚀
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Speed Demon I (30 WPM)</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Achieve 30+ Net WPM speed</p>
+                {highestWpm >= 30 ? (
+                  <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1"><CheckCircle2 className="w-3.5 h-3.5" /> Unlocked</span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-slate-400 mt-1 block">Locked ({highestWpm}/30 WPM)</span>
+                )}
+              </div>
+            </div>
+
+            {/* Badge 2 */}
+            <div className={`p-4 rounded-2xl border flex items-center gap-3 transition-all ${highestWpm >= 50 ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-60'}`}>
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 font-black text-xl flex items-center justify-center shrink-0 shadow-sm">
+                ⚡
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Lok Sewa Master (50 WPM)</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Achieve 50+ Net WPM speed</p>
+                {highestWpm >= 50 ? (
+                  <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1"><CheckCircle2 className="w-3.5 h-3.5" /> Unlocked</span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-slate-400 mt-1 block">Locked ({highestWpm}/50 WPM)</span>
+                )}
+              </div>
+            </div>
+
+            {/* Badge 3 */}
+            <div className={`p-4 rounded-2xl border flex items-center gap-3 transition-all ${averageWpm >= 40 && totalTests >= 5 ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-60'}`}>
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 text-white font-black text-xl flex items-center justify-center shrink-0 shadow-sm">
+                🎓
+              </div>
+              <div>
+                <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Certified Typist Candidate</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Complete 5+ tests with 40+ Avg WPM</p>
+                {averageWpm >= 40 && totalTests >= 5 ? (
+                  <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1"><CheckCircle2 className="w-3.5 h-3.5" /> Ready for Certification!</span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-slate-400 mt-1 block">In Progress ({totalTests}/5 tests)</span>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -9,16 +9,16 @@ import {
   VolumeX,
   Scale,
   Globe,
-  Sparkles,
   Maximize,
-  Minimize
+  Minimize,
+  Award
 } from 'lucide-react';
-import { TestSettings, UserStats } from '../types';
+import { NavigationTab, TestSettings, UserStats } from '../types';
 import { FontSelector } from './FontSelector';
 
 interface NavbarProps {
-  activeTab: 'test' | 'practice' | 'legal' | 'heatmap' | 'history';
-  setActiveTab: (tab: 'test' | 'practice' | 'legal' | 'heatmap' | 'history') => void;
+  activeTab: NavigationTab;
+  setActiveTab: (tab: NavigationTab) => void;
   settings: TestSettings;
   updateSettings: (partial: Partial<TestSettings>) => void;
   userStats: UserStats;
@@ -123,29 +123,29 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
-              id="nav-tab-heatmap"
-              onClick={() => setActiveTab('heatmap')}
+              id="nav-tab-analytics"
+              onClick={() => setActiveTab('analytics')}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'heatmap'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Heatmap & Errors</span>
-            </button>
-
-            <button
-              id="nav-tab-history"
-              onClick={() => setActiveTab('history')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'history'
+                activeTab === 'analytics'
                   ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <BarChart3 className="w-4 h-4" />
               <span>Analytics</span>
+            </button>
+
+            <button
+              id="nav-tab-certification"
+              onClick={() => setActiveTab('certification')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'certification'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-800'
+              }`}
+            >
+              <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>🏆 Certification Test</span>
             </button>
           </nav>
 
@@ -260,26 +260,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Legal Pack</span>
           </button>
           <button
-            onClick={() => setActiveTab('heatmap')}
+            onClick={() => setActiveTab('analytics')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'heatmap'
-                ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Heatmap & Errors</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'history'
+              activeTab === 'analytics'
                 ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
                 : 'text-slate-600 dark:text-slate-400'
             }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Analytics</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('certification')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
+              activeTab === 'certification'
+                ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
+                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-amber-600" />
+            <span>🏆 Certification</span>
           </button>
         </div>
 
