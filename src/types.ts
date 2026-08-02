@@ -71,6 +71,19 @@ export interface LegalTerm {
   exampleSentence?: string;
 }
 
+export interface LegalPassage {
+  id: string;
+  title: string;
+  nepaliTitle: string;
+  category: 'Constitution' | 'Court & Judiciary' | 'Fundamental Rights' | 'Civil & Criminal' | 'Court Procedures' | 'Public Administration' | 'Lok Sewa Model Questions';
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+  lengthCategory: 'Short' | 'Medium' | 'Long'; // Short: ~100-150 words, Medium: ~250-350 words, Long: 500+ words
+  wordCount: number;
+  keyTermsIncluded: string[];
+  text: string;
+  description: string;
+}
+
 export interface PracticeModule {
   id: string;
   title: string;

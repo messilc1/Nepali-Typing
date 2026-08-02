@@ -337,10 +337,7 @@ export default function App() {
             onStartLegalTest={(passageText) => {
               updateSettings({ testType: 'custom', customText: passageText });
               setActiveTab('test');
-            }}
-            onStartTermsTest={(terms) => {
-              updateSettings({ testType: 'custom', customText: terms.join(' ') });
-              setActiveTab('test');
+              setActiveResult(null);
             }}
           />
         )}
