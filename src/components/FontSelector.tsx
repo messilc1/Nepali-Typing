@@ -114,7 +114,11 @@ export const FontSelector: React.FC<FontSelectorProps> = ({
 
       {/* Floating Dropdown Panel */}
       {isOpen && (
-        <div className="absolute right-0 sm:right-auto sm:left-0 mt-2 w-72 sm:w-80 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 p-2 space-y-1 animate-fadeIn max-h-96 overflow-y-auto">
+        <div
+          className={`absolute ${
+            variant === 'navbar' ? 'right-0' : 'left-0 sm:left-0'
+          } mt-2 w-72 sm:w-80 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl z-[100] p-2 space-y-1 animate-fadeIn max-h-96 overflow-y-auto`}
+        >
           
           <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-500">
