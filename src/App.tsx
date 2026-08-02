@@ -85,6 +85,7 @@ export default function App() {
   const [activeResult, setActiveResult] = useState<TestResult | null>(null);
   const [isPersonalBest, setIsPersonalBest] = useState<boolean>(false);
   const [targetText, setTargetText] = useState<string>('');
+  const [activePassageTitle, setActivePassageTitle] = useState<string | undefined>(undefined);
   
   // Realtime Key Heatmap Metrics State
   const [keyStatsMap, setKeyStatsMap] = useState<Record<string, KeyStats>>({});
@@ -304,6 +305,7 @@ export default function App() {
                 settings={settings}
                 updateSettings={updateSettings}
                 targetText={targetText}
+                passageTitle={activePassageTitle}
                 onTestComplete={handleTestComplete}
                 onRestartTest={handleRestartTest}
                 onOpenCustomParagraph={() => setShowCustomParagraphModal(true)}
@@ -334,7 +336,8 @@ export default function App() {
 
         {activeTab === 'legal' && (
           <LegalPackView
-            onStartLegalTest={(passageText) => {
+            onStartLegalTest={(passageText, passageTitle) => {
+              setActivePassageTitle(passageTitle);
               updateSettings({ testType: 'custom', customText: passageText });
               setActiveTab('test');
               setActiveResult(null);
@@ -392,8 +395,10 @@ export default function App() {
       {showCustomParagraphModal && (
         <CustomParagraphModal
           onStartCustomTest={(text) => {
+            setActivePassageTitle('Custom Practice Paragraph');
             updateSettings({ testType: 'custom', customText: text });
             setActiveTab('test');
+            setActiveResult(null);
           }}
           onClose={() => setShowCustomParagraphModal(false)}
         />

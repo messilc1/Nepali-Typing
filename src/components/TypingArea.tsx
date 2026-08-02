@@ -22,6 +22,7 @@ interface TypingAreaProps {
   settings: TestSettings;
   updateSettings: (partial: Partial<TestSettings>) => void;
   targetText: string;
+  passageTitle?: string;
   onTestComplete: (result: TestResult) => void;
   onRestartTest: () => void;
   onOpenCustomParagraph: () => void;
@@ -37,6 +38,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   settings,
   updateSettings,
   targetText,
+  passageTitle,
   onTestComplete,
   onRestartTest,
   onOpenCustomParagraph,
@@ -295,7 +297,20 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       mistypedWordsMap: mistypedWordsRef.current,
       mistypedCharsMap: mistypedCharsRef.current,
       slowWordsMap: {},
-      sampleText: targetText.substring(0, 100) + '...'
+      sampleText: targetText.substring(0, 100) + '...',
+      categoryOrTitle: passageTitle || (
+        settings.testType === 'legal'
+          ? (settings.legalCategory || 'Lok Sewa Legal Pack')
+          : settings.testType === 'custom'
+          ? 'Custom Paragraph'
+          : settings.testType === 'quote'
+          ? 'Quote Test'
+          : settings.testType === 'paragraph'
+          ? 'Paragraph Test'
+          : settings.testType === 'words'
+          ? `${settings.wordCount} Words Test`
+          : `${settings.durationSeconds}s Speed Test`
+      )
     };
 
     onTestComplete(resultObj);

@@ -61,6 +61,7 @@ export interface TestResult {
   mistypedCharsMap: Record<string, number>; // char -> count
   slowWordsMap: Record<string, number>; // word -> avg ms
   sampleText: string;
+  categoryOrTitle?: string;
 }
 
 export interface LegalTerm {

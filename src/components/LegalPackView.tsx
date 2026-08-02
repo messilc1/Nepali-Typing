@@ -4,7 +4,7 @@ import { LEGAL_PASSAGES } from '../data/wordPacks';
 import { LegalPassage } from '../types';
 
 interface LegalPackViewProps {
-  onStartLegalTest: (passageText: string) => void;
+  onStartLegalTest: (passageText: string, passageTitle?: string) => void;
 }
 
 export const LegalPackView: React.FC<LegalPackViewProps> = ({
@@ -96,7 +96,7 @@ export const LegalPackView: React.FC<LegalPackViewProps> = ({
 
           <div className="flex flex-wrap items-center gap-3 mt-6">
             <button
-              onClick={() => onStartLegalTest(LEGAL_PASSAGES[0].text)}
+              onClick={() => onStartLegalTest(LEGAL_PASSAGES[0].text, LEGAL_PASSAGES[0].nepaliTitle)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-md transition-all transform hover:-translate-y-0.5"
             >
               <Play className="w-4 h-4 fill-slate-950" />
@@ -104,7 +104,7 @@ export const LegalPackView: React.FC<LegalPackViewProps> = ({
             </button>
 
             <button
-              onClick={() => onStartLegalTest(LEGAL_PASSAGES[1].text)}
+              onClick={() => onStartLegalTest(LEGAL_PASSAGES[1].text, LEGAL_PASSAGES[1].nepaliTitle)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-extrabold text-xs border border-white/20 transition-all transform hover:-translate-y-0.5"
             >
               <Play className="w-4 h-4 fill-white" />
@@ -112,7 +112,7 @@ export const LegalPackView: React.FC<LegalPackViewProps> = ({
             </button>
 
             <button
-              onClick={() => onStartLegalTest(LEGAL_PASSAGES[2].text)}
+              onClick={() => onStartLegalTest(LEGAL_PASSAGES[2].text, LEGAL_PASSAGES[2].nepaliTitle)}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-600 text-white font-extrabold text-xs border border-indigo-500/40 transition-all"
             >
               <BookOpen className="w-4 h-4 text-white" />
@@ -291,7 +291,7 @@ export const LegalPackView: React.FC<LegalPackViewProps> = ({
               </span>
 
               <button
-                onClick={() => onStartLegalTest(passage.text)}
+                onClick={() => onStartLegalTest(passage.text, passage.nepaliTitle)}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md shadow-indigo-500/20 transition-all transform group-hover:scale-[1.02]"
               >
                 <Play className="w-3.5 h-3.5 fill-white" />
