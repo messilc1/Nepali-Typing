@@ -19,7 +19,12 @@ import {
   Gavel,
   Scroll,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Zap,
+  Keyboard,
+  FileText,
+  Milestone,
+  HeartHandshake
 } from 'lucide-react';
 
 interface AboutViewProps {
@@ -365,6 +370,142 @@ export const AboutView: React.FC<AboutViewProps> = () => {
               {skill}
             </span>
           ))}
+        </div>
+      </div>
+
+      {/* Platform Features Grid */}
+      <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md p-6 sm:p-10 space-y-6">
+        
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+              <Zap className="w-6 h-6 text-amber-500" />
+              <span>Platform Core Features</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Comprehensive tools engineered for complete Devanagari typing mastery
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+          
+          <div className="p-5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+              <Keyboard className="w-5 h-5" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+              Real-Time Romanized Unicode
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+              Instant transliteration from standard QWERTY keys to official Devanagari characters (e.g. "nepal" &rarr; "नेपाल").
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-md">
+              <Scale className="w-5 h-5" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+              Lok Sewa Legal Pack
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+              Curated legal passages, Supreme Court terminology, and civil service exam texts designed for government applicants.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+              <Award className="w-5 h-5" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+              NTPC Certification Exam
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+              3-stage standardized typing exam with anti-cheat monitoring, identity verification, and printable certificates.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+              Targeted Practice Drills
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+              Practice individual consonants, matra combinations, conjunct characters (संयुक्त अक्षर), numbers, and symbols.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+              Heatmap Analytics
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+              Visual keyboard highlighting weak keys, error-prone letters, typing consistency percentage, and progress over time.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 space-y-2">
+            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-md">
+              <FileText className="w-5 h-5" />
+            </div>
+            <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+              Custom Paragraph Import
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+              Import custom documents, legal briefs, or personal notes to practice typing custom real-world materials.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Future Updates Roadmap */}
+      <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md p-6 sm:p-8 space-y-5">
+        <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-700 pb-4">
+          <div className="p-3 rounded-2xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+            <Milestone className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              Future Updates Roadmap
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Upcoming enhancements scheduled for future platform releases
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-medium">
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-slate-900 dark:text-slate-100 font-extrabold block mb-0.5">Multiplayer Speed Racing</strong>
+              <span className="text-slate-600 dark:text-slate-400">Compete live against other candidates in real-time Devanagari speed battles.</span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-slate-900 dark:text-slate-100 font-extrabold block mb-0.5">AI Rhythm & Ergonomics</strong>
+              <span className="text-slate-600 dark:text-slate-400">Get instant feedback on finger positioning and key release timing.</span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-slate-900 dark:text-slate-100 font-extrabold block mb-0.5">Nepali Dictation Mode (श्रुतिलेख)</strong>
+              <span className="text-slate-600 dark:text-slate-400">Practice typing directly from spoken audio clips for court reporting tests.</span>
+            </div>
+          </div>
         </div>
       </div>
 
