@@ -26,6 +26,7 @@ import {
 import confetti from 'canvas-confetti';
 import { CertificationUser, CertificationAttempt, CertificationTestScore } from '../types';
 import { transliterateRomanToNepali } from '../utils/nepaliTransliteration';
+import { OfficialCertificateDocument } from './OfficialCertificateDocument';
 
 // Standardized Certification Test Passages
 // Test 1: Non-continuous zigzag single character array (Consonants, Vowels, Matras, Numbers, Conjuncts)
@@ -884,194 +885,17 @@ export const CertificationView: React.FC = () => {
       )}
 
       {/* ==================================================== */}
-      {/* STEP 5: FINAL VERIFIED CERTIFICATE DISPLAY            */}
+      {/* STEP 5: AUTOMATIC TWO-PAGE OFFICIAL CERTIFICATE     */}
       {/* ==================================================== */}
-      {currentAttempt?.status === 'completed' && (
-        <div className="space-y-8 animate-fadeIn">
-          
-          {/* Certificate Result Announcement */}
-          <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 shadow-xl text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 font-black text-3xl flex items-center justify-center mx-auto shadow-md">
-              🏆
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-              Official Certificate Verified & Issued!
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto font-semibold">
-              Congratulations <strong>{currentAttempt.user.fullName}</strong>! Information has been verified by the examination creator. Your official NTPC Certificate is active and downloadable.
-            </p>
-
-            {/* Score Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto pt-2">
-              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-                <div className="text-[10px] text-amber-800 dark:text-amber-300 font-bold uppercase">Certificate Grade</div>
-                <div className="text-xl font-black text-amber-700 dark:text-amber-400 mt-1">{currentAttempt.certificateGrade}</div>
-              </div>
-              <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
-                <div className="text-[10px] text-blue-800 dark:text-blue-300 font-bold uppercase">Average Net Speed</div>
-                <div className="text-xl font-black text-blue-700 dark:text-blue-400 mt-1">{currentAttempt.avgNetWpm} WPM</div>
-              </div>
-              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
-                <div className="text-[10px] text-emerald-800 dark:text-emerald-300 font-bold uppercase">Average Accuracy</div>
-                <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{currentAttempt.avgAccuracy}%</div>
-              </div>
-              <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
-                <div className="text-[10px] text-purple-800 dark:text-purple-300 font-bold uppercase">Average Rhythm</div>
-                <div className="text-xl font-black text-purple-700 dark:text-purple-400 mt-1">{currentAttempt.avgConsistency}%</div>
-              </div>
-            </div>
-
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
-              <button
-                onClick={() => setShowCertificateModal(true)}
-                className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 hover:scale-[1.02] transition-all cursor-pointer flex items-center gap-2"
-              >
-                <Eye className="w-5 h-5 text-slate-950" />
-                <span>View & Print Official Certificate</span>
-              </button>
-
-              <button
-                onClick={() => window.print()}
-                className="px-6 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-extrabold text-xs shadow-md transition-all cursor-pointer flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Print / Download PDF</span>
-              </button>
-
-              <button
-                onClick={handleStartExam}
-                className="px-5 py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Retake Exam</span>
-              </button>
-            </div>
-
-          </div>
-
+      {(currentAttempt?.status === 'completed' || showCertificateModal) && currentAttempt && (
+        <div className="space-y-6 animate-fadeIn">
+          <OfficialCertificateDocument
+            attempt={currentAttempt}
+            onClose={() => setShowCertificateModal(false)}
+          />
         </div>
       )}
 
-      {/* ==================================================== */}
-      {/* CERTIFICATE MODAL / DISPLAY FRAME                    */}
-      {/* ==================================================== */}
-      {(showCertificateModal || currentAttempt?.status === 'completed') && currentAttempt && (
-        <div id="official-certificate-modal" className="bg-white dark:bg-slate-900 rounded-3xl border-4 border-amber-500 p-8 sm:p-12 shadow-2xl relative overflow-hidden space-y-8 print:border-2 print:shadow-none print:p-6 print:m-0">
-          
-          {/* Certificate Decorative Frame Border */}
-          <div className="border-2 border-dashed border-amber-300 dark:border-amber-700 p-6 sm:p-10 rounded-2xl relative space-y-6">
-            
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left border-b border-amber-200 dark:border-amber-800/60 pb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 font-black text-2xl flex items-center justify-center shrink-0 shadow-md">
-                  🇳🇵
-                </div>
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight uppercase">
-                    National Typing Proficiency Certificate
-                  </h1>
-                  <p className="text-xs text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider">
-                    Nepali Typing Pro &bull; Official Examination Board
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right text-xs text-slate-500 dark:text-slate-400 font-semibold">
-                <div>Certificate ID: <strong className="text-slate-900 dark:text-slate-100 font-mono">{currentAttempt.id}</strong></div>
-                <div>Issue Date: <strong>{new Date(currentAttempt.completedAt || Date.now()).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></div>
-                <div className="text-emerald-600 font-bold">Creator Verified: Yes</div>
-              </div>
-            </div>
-
-            {/* Certificate Body Text */}
-            <div className="text-center space-y-4 py-4">
-              <p className="text-xs uppercase font-extrabold text-slate-400 tracking-widest">
-                This is to certify that
-              </p>
-              
-              <h2 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-slate-100 tracking-tight bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 bg-clip-text text-transparent underline decoration-amber-400 decoration-2 underline-offset-8">
-                {currentAttempt.user.fullName}
-              </h2>
-
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-2xl mx-auto font-medium leading-relaxed">
-                bearing <strong>{currentAttempt.user.idType} ({currentAttempt.user.idNumber})</strong> of <strong>{currentAttempt.user.permanentAddress}, {currentAttempt.user.district}, {currentAttempt.user.province}</strong>, has successfully appeared in the official National Devanagari Typing Examination and demonstrated typing proficiency across three standardized tiers.
-              </p>
-
-              {/* Grade Badge */}
-              <div className="inline-block px-8 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-lg sm:text-xl shadow-lg my-2">
-                🏆 {currentAttempt.certificateGrade?.toUpperCase()} TYPING CERTIFICATE
-              </div>
-            </div>
-
-            {/* Individual Score Breakdown Table */}
-            <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 space-y-2">
-              <div className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider text-center">
-                Examination Performance Breakdown
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-semibold pt-1">
-                {currentAttempt.scores.map((s, idx) => (
-                  <div key={idx} className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                    <div className="text-[10px] text-slate-400 font-bold uppercase">{s.testName}</div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="font-extrabold text-blue-600 dark:text-blue-400">{s.netWpm} Net WPM</span>
-                      <span className="font-extrabold text-emerald-600">{s.accuracy}% Acc</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Footer / Signatures / QR Code */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-6 border-t border-amber-200 dark:border-amber-800/60 text-xs">
-              
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-16 bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl p-1 flex items-center justify-center shrink-0">
-                  <QrCode className="w-12 h-12 text-slate-800 dark:text-slate-200" />
-                </div>
-                <div>
-                  <div className="font-extrabold text-slate-800 dark:text-slate-200">Scan to Verify Authenticity</div>
-                  <div className="text-[10px] text-slate-500 font-mono">nepalitypingpro.gov.np/verify</div>
-                  <div className="text-[10px] text-emerald-600 font-extrabold mt-0.5">Status: Verified & Tamper-Proof</div>
-                </div>
-              </div>
-
-              {/* Official Seal Stamp */}
-              <div className="w-20 h-20 rounded-full border-4 border-amber-500 flex items-center justify-center text-center p-1 text-[9px] font-black uppercase text-amber-700 dark:text-amber-400 shrink-0 rotate-12">
-                Official Examination Seal
-              </div>
-
-              {/* Registrar Signature */}
-              <div className="text-center sm:text-right space-y-1">
-                <div className="font-serif italic text-lg text-slate-800 dark:text-slate-200">Subhash Chandra Sharma</div>
-                <div className="w-36 h-0.5 bg-slate-400 dark:bg-slate-600 ml-auto"></div>
-                <div className="font-extrabold text-slate-800 dark:text-slate-200">Chief Creator & Registrar</div>
-                <div className="text-[10px] text-slate-500">National Typing Examination Board</div>
-              </div>
-
-            </div>
-
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
-            <button
-              onClick={() => setShowCertificateModal(false)}
-              className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
-            >
-              Close Certificate View
-            </button>
-
-            <button
-              onClick={() => window.print()}
-              className="px-6 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs shadow-md cursor-pointer flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print / Download Official PDF</span>
-            </button>
-          </div>
-
-        </div>
-      )}
 
     </div>
   );

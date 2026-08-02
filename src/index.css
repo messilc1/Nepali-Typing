@@ -76,3 +76,59 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out forwards;
 }
+
+/* Print Styles for A4 Two-Page Certification PDF Generation */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide app navigation, headers, footers, and background UI during print */
+  header,
+  footer,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Expand print container to full printable page */
+  #root,
+  main,
+  #certification-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .cert-page {
+    width: 100% !important;
+    min-height: 280mm !important;
+    padding: 10mm !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    box-shadow: none !important;
+  }
+
+  .cert-page-1 {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .cert-page-2 {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+}
