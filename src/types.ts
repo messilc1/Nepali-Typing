@@ -38,7 +38,10 @@ export interface CertificationAttempt {
   user: CertificationUser;
   startedAt: number;
   completedAt?: number;
-  status: 'in_progress' | 'completed' | 'invalidated';
+  status: 'in_progress' | 'pending_verification' | 'completed' | 'invalidated';
+  isVerifiedByCreator?: boolean;
+  verifiedAt?: number;
+  verifiedBy?: string;
   invalidationReason?: string;
   tabSwitchViolations: number;
   scores: CertificationTestScore[];

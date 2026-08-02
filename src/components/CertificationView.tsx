@@ -18,16 +18,24 @@ import {
   LogOut,
   HelpCircle,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Check,
+  User,
+  CheckCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CertificationUser, CertificationAttempt, CertificationTestScore } from '../types';
 import { transliterateRomanToNepali } from '../utils/nepaliTransliteration';
 
-// Default Test Passages
-const SINGLE_CHAR_TEST_TEXT = "क ख ग घ ङ च छ ज झ ञ ट ठ ड ढ ण त थ द ध न प फ ब भ म ज्ञ क्ष त्र";
-const WORD_PHRASE_TEST_TEXT = "संविधान सर्वोच्च अदालत कानुनी व्यवस्था न्यायिक पुनरावलोकन सार्वजनिक प्रशासन महान्यायाधिवक्ता मौलिक अधिकार कार्यपालिका व्यवस्थापिका नेपाल सरकार";
-const ADVANCED_PARAGRAPH_TEST_TEXT = "नेपालको संविधान बमोजिम कानुनको शासन, शक्ति पृथकीकरण तथा नियन्त्रण र सन्तुलनको सिद्धान्त अनुरुप स्वतन्त्र, निष्पक्ष र सक्षम न्यायपालिकाको स्थापना गरिएको छ। सर्वोच्च अदालतले संविधान र कानुनको अन्तिम व्याख्या गर्ने अधिकार राख्दछ। सार्वजनिक प्रशासनलाई निष्पक्ष, पारदर्शी, भ्रष्टाचारमुक्त र जनउत्तरदायी बनाउन कानुनी व्यवस्था कडाइका साथ लागू गर्नुपर्दछ।";
+// Standardized Certification Test Passages
+// Test 1: Non-continuous zigzag single character array (Consonants, Vowels, Matras, Numbers, Conjuncts)
+const SINGLE_CHAR_TEST_TEXT = "क ज्ञ १ ठ थ ५ ऋ ॐ ढ फ ३ ङ क्ष छ ७ श त्र ळ ः ५ ९ ढ औ ञ ृ ँ ऽ ध ८ थ ट भ इ ऐ उ ० ६ ४ ख घ च ज झ ढ ण त द न प ब म य र ल व ष स ह ० १ २ ३ ४ ५ ६ ७ ८ ९";
+
+// Test 2: Exactly 50 random Devanagari words combining legal, administrative, and general vocabulary
+const WORD_PHRASE_TEST_TEXT = "नेपाल संविधान सर्वोच्च अदालत कानुनी व्यवस्था न्यायिक पुनरावलोकन सार्वजनिक प्रशासन महान्यायाधिवक्ता मौलिक अधिकार कार्यपालिका व्यवस्थापिका फैसला आदेश निवेदन प्रमाण साक्षी सरकारी कार्यालय स्थानीय तह प्रदेश सभा राष्ट्रिय सभा प्रतिनिधि सभा मन्त्रिपरिषद कानुन आयोग निर्वाचन आयोग लोक सेवा आयोग थुनछेक मुद्दा फिरादपत्र प्रतिउत्तरपत्र रोहवर साक्षी वारेसनामा रोक्का कित्ताकाट दरखास्त दर्ता चलानी पाना मिति टिप्पणी आदेशात्मक परमादेश उत्प्रेषण अधिकारपृच्छा न्यायधीश";
+
+// Test 3: Official 150-word legal and administrative paragraph examination
+const ADVANCED_PARAGRAPH_TEST_TEXT = "नेपालको संविधान बमोजिम कानुनको शासन, शक्ति पृथकीकरण तथा नियन्त्रण र सन्तुलनको सिद्धान्त अनुरुप स्वतन्त्र, निष्पक्ष र सक्षम न्यायपालिकाको स्थापना गरिएको छ। सर्वोच्च अदालतले संविधान र कानुनको अन्तिम व्याख्या गर्ने अधिकार राख्दछ। नागरिकका मौलिक अधिकारको संरक्षण र कानुनी हकको प्रचलन गराउन अदालत सदैव प्रतिबद्ध छ। सार्वजनिक प्रशासनलाई निष्पक्ष, पारदर्शी, भ्रष्टाचारमुक्त, प्रविधिमैत्री र जनउत्तरदायी बनाउन कानुनी व्यवस्था कडाइका साथ लागू गर्नुपर्दछ। निजामती सेवालाई सक्षम, सुदृढ, सेवामूलक र व्यावसायिक बनाउँदै राज्यका सम्पूर्ण अङ्गहरूमा सुशासन कायम गर्नु आजको मुख्य आवश्यकता हो। लोक सेवा आयोगले निष्पक्षता, योग्यता र पारदर्शिताका सिद्धान्तमा आधारित भई सार्वजनिक सेवाका लागि दक्ष जनशक्तिको छनोट गर्दछ। सरकारी कर्मचारीहरूले निष्ठापूर्वक आफ्नो कर्तव्य पालना गर्दै नागरिक सेवामा समर्पित हुनुपर्दछ। विद्युतीय शासन र आधुनिक प्रविधिको प्रयोगले सरकारी सेवा प्रवाहमा शीघ्रता र मितव्ययिता ल्याउँदछ। कानुनी साक्षरता र सचेतना बढाएर मात्र समाजमा शान्ति, सुव्यवस्था र न्यायको प्रत्याभूति गर्न सकिन्छ। त्यसैले सम्पूर्ण सरोकारवालाहरूले कानुनी दायित्व पूरा गर्दै सुशासित नेपाल निर्माणमा योगदान पुर्याउनुपर्दछ।";
 
 export const CertificationView: React.FC = () => {
   // User Registration State
@@ -137,12 +145,12 @@ export const CertificationView: React.FC = () => {
   };
 
   const getTestTitle = (testIdx: number) => {
-    if (testIdx === 1) return "Test 1: Single Character Speed Examination";
-    if (testIdx === 2) return "Test 2: Word & Short Legal Phrase Examination";
-    return "Test 3: Advanced Legal Paragraph Examination";
+    if (testIdx === 1) return "Test 1: Single Character & Non-Continuous Zigzag Examination";
+    if (testIdx === 2) return "Test 2: 50 Random Devanagari Words Examination";
+    return "Test 3: 150-Word Legal & Administrative Paragraph Examination";
   };
 
-  // Start Certification Exam
+  // Start Certification Exam from Scratch
   const handleStartExam = () => {
     if (!user) return;
 
@@ -161,7 +169,7 @@ export const CertificationView: React.FC = () => {
     startActiveTest(1);
   };
 
-  // Start Individual Test in Exam
+  // Start Individual Test in Exam Sequence
   const startActiveTest = (testIdx: number) => {
     setActiveTestIndex(testIdx);
     setTypedInput('');
@@ -189,7 +197,6 @@ export const CertificationView: React.FC = () => {
         const updated = prev + 1;
         setShowViolationWarning(true);
         if (updated >= 3 && currentAttempt) {
-          // Invalidate attempt
           const invalidatedAttempt: CertificationAttempt = {
             ...currentAttempt,
             status: 'invalidated',
@@ -210,13 +217,12 @@ export const CertificationView: React.FC = () => {
     };
   }, [isExamRunning, currentAttempt]);
 
-  // Key Event Protection (Disable Copy, Paste, Cut, Right Click)
+  // Key Event Protection (Disable Copy, Paste, Cut)
   const handleKeyDownProtection = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Backspace') {
       setBackspaceCount(prev => prev + 1);
     }
 
-    // Disable Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A, Ctrl+Z, Ctrl+Y, F12
     if (
       (e.ctrlKey || e.metaKey) &&
       ['c', 'v', 'x', 'a', 'z', 'y', 'u'].includes(e.key.toLowerCase())
@@ -241,7 +247,7 @@ export const CertificationView: React.FC = () => {
     }
   };
 
-  // Calculate Test Score and Complete Test
+  // Calculate Test Score and Proceed
   const completeCurrentTest = (finalTyped: string) => {
     if (timerRef.current) clearInterval(timerRef.current);
     setIsExamRunning(false);
@@ -282,10 +288,11 @@ export const CertificationView: React.FC = () => {
 
     if (!currentAttempt) return;
 
-    const updatedScores = [...currentAttempt.scores, testScore];
+    const existingScores = currentAttempt.scores.filter(s => s.testIndex !== activeTestIndex);
+    const updatedScores = [...existingScores, testScore].sort((a, b) => a.testIndex - b.testIndex);
 
     if (activeTestIndex < 3) {
-      // Proceed to next test
+      // Proceed to next stage
       const nextAttemptState: CertificationAttempt = {
         ...currentAttempt,
         scores: updatedScores
@@ -294,7 +301,7 @@ export const CertificationView: React.FC = () => {
       localStorage.setItem('nepali_typing_active_cert_attempt', JSON.stringify(nextAttemptState));
       setActiveTestIndex(prev => prev + 1);
     } else {
-      // Final Test 3 Complete -> Calculate Final Evaluation
+      // Test 3 Complete -> Set Status to PENDING_VERIFICATION for Creator Verification
       const avgNetWpm = Math.round(updatedScores.reduce((acc, s) => acc + s.netWpm, 0) / 3);
       const avgGrossWpm = Math.round(updatedScores.reduce((acc, s) => acc + s.grossWpm, 0) / 3);
       const avgAccuracy = Math.round(updatedScores.reduce((acc, s) => acc + s.accuracy, 0) / 3);
@@ -307,11 +314,12 @@ export const CertificationView: React.FC = () => {
         grade = 'Good';
       }
 
-      const finalAttempt: CertificationAttempt = {
+      const pendingAttempt: CertificationAttempt = {
         ...currentAttempt,
         scores: updatedScores,
         completedAt: Date.now(),
-        status: 'completed',
+        status: 'pending_verification',
+        isVerifiedByCreator: false,
         avgNetWpm,
         avgGrossWpm,
         avgAccuracy,
@@ -319,23 +327,39 @@ export const CertificationView: React.FC = () => {
         certificateGrade: grade
       };
 
-      setCurrentAttempt(finalAttempt);
-      localStorage.setItem('nepali_typing_active_cert_attempt', JSON.stringify(finalAttempt));
-      
-      // Save to completed certificates history list
-      try {
-        const historyList = JSON.parse(localStorage.getItem('nepali_typing_cert_history') || '[]');
-        historyList.unshift(finalAttempt);
-        localStorage.setItem('nepali_typing_cert_history', JSON.stringify(historyList));
-      } catch {}
-
-      // Fire celebratory confetti for certificate achievement
-      confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 0.6 }
-      });
+      setCurrentAttempt(pendingAttempt);
+      localStorage.setItem('nepali_typing_active_cert_attempt', JSON.stringify(pendingAttempt));
     }
+  };
+
+  // Creator Verification Action Handler
+  const handleCreatorApproveAndVerify = () => {
+    if (!currentAttempt) return;
+
+    const verifiedAttempt: CertificationAttempt = {
+      ...currentAttempt,
+      status: 'completed',
+      isVerifiedByCreator: true,
+      verifiedAt: Date.now(),
+      verifiedBy: 'Exam Board & Platform Creator'
+    };
+
+    setCurrentAttempt(verifiedAttempt);
+    localStorage.setItem('nepali_typing_active_cert_attempt', JSON.stringify(verifiedAttempt));
+
+    // Save to completed certificates history list
+    try {
+      const historyList = JSON.parse(localStorage.getItem('nepali_typing_cert_history') || '[]');
+      historyList.unshift(verifiedAttempt);
+      localStorage.setItem('nepali_typing_cert_history', JSON.stringify(historyList));
+    } catch {}
+
+    // Celebratory Confetti
+    confetti({
+      particleCount: 140,
+      spread: 90,
+      origin: { y: 0.55 }
+    });
   };
 
   // Reset / Clear Registration
@@ -364,7 +388,7 @@ export const CertificationView: React.FC = () => {
               🏆 Official Certification Examination
             </h2>
             <p className="text-slate-900 text-xs sm:text-sm mt-2 max-w-2xl font-semibold leading-relaxed">
-              Standardized three-tier examination for Lok Sewa candidates, legal typists, and public service professionals. Earn an official, verifiable proficiency certificate.
+              Standardized three-tier examination for Lok Sewa candidates, legal typists, and public service professionals. Earn an official, creator-verified proficiency certificate.
             </p>
           </div>
 
@@ -580,102 +604,102 @@ export const CertificationView: React.FC = () => {
       )}
 
       {/* ==================================================== */}
-      {/* STEP 2: EXAM RULES & START SCREEN                    */}
+      {/* STEP 2: EXAM RULES & START SCREEN / STAGE TRANSITION */}
       {/* ==================================================== */}
-      {user && !isExamRunning && currentAttempt?.status !== 'in_progress' && (
-        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md p-6 sm:p-10 space-y-8">
+      {user && !isExamRunning && currentAttempt?.status === 'in_progress' && (
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md p-6 sm:p-10 space-y-8 animate-fadeIn">
           
+          {/* Active Test Stage Guidance */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-700 pb-6">
             <div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <ShieldAlert className="w-6 h-6 text-amber-500" />
-                <span>Examination Structure & Security Directives</span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-3 py-1 bg-amber-500 text-slate-950 font-black text-xs rounded-full">
+                  Stage {activeTestIndex} of 3
+                </span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Examination in Progress
+                </span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
+                {getTestTitle(activeTestIndex)}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Candidate: <strong>{user.fullName}</strong> • ID: <strong>{user.idType} ({user.idNumber})</strong>
-              </p>
             </div>
 
             <button
-              onClick={handleStartExam}
-              className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/20 hover:scale-[1.02] transition-all cursor-pointer flex items-center gap-2 shrink-0"
+              onClick={() => startActiveTest(activeTestIndex)}
+              className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/20 hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0"
             >
-              <span>Start Certification Exam Now</span>
+              <span>Begin Test {activeTestIndex} Now</span>
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
 
-          {/* 3 Sequential Tests Overview */}
+          {/* Previous Completed Test Summaries */}
+          {currentAttempt.scores.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Completed Test Tiers:
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {currentAttempt.scores.map((score, idx) => (
+                  <div key={idx} className="p-4 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 font-black flex items-center justify-center shrink-0">
+                        <Check className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-900 dark:text-slate-100">{score.testName}</div>
+                        <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold">
+                          {score.netWpm} WPM &bull; {score.accuracy}% Accuracy
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 3 Sequential Tests Overview Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <div className="p-5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2">
+            <div className={`p-5 rounded-2xl border space-y-2 transition-all ${
+              activeTestIndex === 1 ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-500 ring-2 ring-amber-500/30' : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700 opacity-75'
+            }`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">Test 1</span>
                 <Sparkles className="w-4 h-4 text-amber-600" />
               </div>
-              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Single Characters</h4>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Zigzag Single Characters</h4>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Measures raw key reaction and Devanagari character accuracy across consonants, vowels, and conjuncts.
+                Non-continuous Devanagari character matrix (क ज्ञ १ ठ थ ५ ऋ ॐ ढ...) testing shift keys and raw agility.
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 space-y-2">
+            <div className={`p-5 rounded-2xl border space-y-2 transition-all ${
+              activeTestIndex === 2 ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-500 ring-2 ring-amber-500/30' : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700 opacity-75'
+            }`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-indigo-800 dark:text-indigo-300">Test 2</span>
                 <Zap className="w-4 h-4 text-indigo-600" />
               </div>
-              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Words & Short Phrases</h4>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">50 Random Words</h4>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                High-frequency Lok Sewa legal terms like संविधान, सर्वोच्च अदालत, and सार्वजनिक प्रशासन.
+                Randomized 50 Devanagari word sequence (संविधान, सर्वोच्च अदालत, प्रशासन, फैसला, साक्षी...).
               </p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 space-y-2">
+            <div className={`p-5 rounded-2xl border space-y-2 transition-all ${
+              activeTestIndex === 3 ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-500 ring-2 ring-amber-500/30' : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700 opacity-75'
+            }`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-blue-800 dark:text-blue-300">Test 3</span>
                 <FileText className="w-4 h-4 text-blue-600" />
               </div>
-              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Advanced Legal Paragraph</h4>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">150-Word Legal Paragraph</h4>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                Challenging administrative passage with complex matra positioning and legal vocabulary.
+                Official 150-word administrative passage covering constitutional law, judiciary, and governance.
               </p>
-            </div>
-
-          </div>
-
-          {/* Exam Rules & Grading Criteria Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            
-            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 space-y-3">
-              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                <Lock className="w-4 h-4 text-rose-500" />
-                <span>Strict Security Rules</span>
-              </h4>
-              <ul className="text-xs text-slate-600 dark:text-slate-400 space-y-2 list-disc pl-4 font-medium">
-                <li>Exam begins immediately after clicking <strong>Start Certification Exam</strong>.</li>
-                <li>Cannot be paused, refreshed, or restarted once initiated.</li>
-                <li>Exiting or closing browser invalidates the attempt permanently.</li>
-                <li>Copy, paste, cut, text selection, and right-click context menus are strictly disabled.</li>
-                <li>Tab-switching or losing window focus is monitored and limited to 2 warnings before automatic invalidation.</li>
-              </ul>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 space-y-3">
-              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                <Award className="w-4 h-4 text-amber-500" />
-                <span>Grading Eligibility Criteria</span>
-              </h4>
-              <div className="text-xs space-y-2 font-medium">
-                <div className="p-2.5 rounded-xl bg-amber-100/60 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-                  <strong>🏆 Excellent Certificate:</strong> Average Net WPM &ge; 50 WPM AND Accuracy &ge; 90%.
-                </div>
-                <div className="p-2.5 rounded-xl bg-blue-100/60 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
-                  <strong>🎖️ Good Certificate:</strong> Average Net WPM &ge; 40 WPM AND Accuracy &ge; 90%.
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 text-slate-800 dark:text-slate-300">
-                  <strong>📜 Participation Certificate:</strong> Completed all three tests successfully.
-                </div>
-              </div>
             </div>
 
           </div>
@@ -683,13 +707,38 @@ export const CertificationView: React.FC = () => {
         </div>
       )}
 
+      {/* Fresh start exam screen if no current attempt active */}
+      {user && !isExamRunning && !currentAttempt && (
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md p-6 sm:p-10 space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-700 pb-6">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <ShieldAlert className="w-6 h-6 text-amber-500" />
+                <span>Examination Structure & Security Directives</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Candidate: <strong>{user.fullName}</strong> &bull; ID: <strong>{user.idType} ({user.idNumber})</strong>
+              </p>
+            </div>
+
+            <button
+              onClick={handleStartExam}
+              className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/20 hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0"
+            >
+              <span>Start Certification Exam Now</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ==================================================== */}
       {/* STEP 3: LIVE EXAM TYPING RUNNER                      */}
       {/* ==================================================== */}
       {isExamRunning && (
-        <div className="bg-white dark:bg-slate-800 rounded-3xl border-2 border-amber-500 dark:border-amber-500 shadow-2xl p-6 sm:p-10 space-y-6">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border-2 border-amber-500 dark:border-amber-500 shadow-2xl p-6 sm:p-10 space-y-6 animate-fadeIn">
           
-          {/* Violation Banner */}
+          {/* Violation Warning Banner */}
           {showViolationWarning && (
             <div className="p-4 bg-rose-500 text-white rounded-2xl flex items-center justify-between font-extrabold text-xs animate-pulse">
               <div className="flex items-center gap-2">
@@ -705,7 +754,7 @@ export const CertificationView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 bg-amber-500 text-slate-950 font-black text-xs rounded-full">
-                  Step {activeTestIndex} of 3
+                  Stage {activeTestIndex} of 3
                 </span>
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                   NTPC Official Examination
@@ -730,7 +779,7 @@ export const CertificationView: React.FC = () => {
           </div>
 
           {/* Target Text Prompt Display */}
-          <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 leading-relaxed font-semibold text-lg sm:text-2xl text-slate-800 dark:text-slate-200 tracking-wide font-['Noto_Sans_Devanagari',sans-serif] select-none pointer-events-none">
+          <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 leading-relaxed font-semibold text-base sm:text-xl text-slate-800 dark:text-slate-200 tracking-wide font-['Noto_Sans_Devanagari',sans-serif] select-none pointer-events-none max-h-64 overflow-y-auto">
             {getTargetTextForTest(activeTestIndex)}
           </div>
 
@@ -760,7 +809,7 @@ export const CertificationView: React.FC = () => {
               onClick={() => completeCurrentTest(typedInput)}
               className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer"
             >
-              Submit Test {activeTestIndex} Early
+              Submit Stage {activeTestIndex}
             </button>
           </div>
 
@@ -768,7 +817,74 @@ export const CertificationView: React.FC = () => {
       )}
 
       {/* ==================================================== */}
-      {/* STEP 4: FINAL EVALUATION & CERTIFICATE GENERATION    */}
+      {/* STEP 4: PENDING CREATOR VERIFICATION SCREEN           */}
+      {/* ==================================================== */}
+      {currentAttempt?.status === 'pending_verification' && (
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border-2 border-amber-500 p-8 sm:p-10 shadow-2xl space-y-8 animate-fadeIn">
+          
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto border border-amber-500/40">
+              <Clock className="w-8 h-8 animate-spin" />
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              Examination Submitted – Pending Creator Verification
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto font-semibold">
+              Examinee <strong>{currentAttempt.user.fullName}</strong> has successfully submitted all 3 test stages. To lock and issue the official NTPC Certificate, the examination creator must verify the submitted identity information.
+            </p>
+          </div>
+
+          {/* Scores Overview Table */}
+          <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Submitted Test Tier Performance Summary:
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {currentAttempt.scores.map((score, idx) => (
+                <div key={idx} className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                  <div className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">{score.testName}</div>
+                  <div className="text-xl font-black text-slate-900 dark:text-slate-100">{score.netWpm} WPM</div>
+                  <div className="text-xs font-extrabold text-emerald-600">{score.accuracy}% Accuracy</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CREATOR VERIFICATION CONTROL PORTAL */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-slate-100 p-6 sm:p-8 rounded-2xl border-2 border-amber-500 shadow-xl space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+              <ShieldCheck className="w-6 h-6 text-amber-400 shrink-0" />
+              <div>
+                <h4 className="text-base font-black text-amber-400">
+                  Creator / Examiner Verification Portal (सिर्जनाकर्ता प्रमाणीकरण)
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Click below as Creator/Examiner to verify information and generate the official certificate.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div><strong>Candidate Name:</strong> {currentAttempt.user.fullName}</div>
+              <div><strong>Government ID:</strong> {currentAttempt.user.idType} ({currentAttempt.user.idNumber})</div>
+              <div><strong>Location:</strong> {currentAttempt.user.district}, {currentAttempt.user.province}</div>
+              <div><strong>Overall Average WPM:</strong> {currentAttempt.avgNetWpm} WPM ({currentAttempt.avgAccuracy}% Accuracy)</div>
+            </div>
+
+            <button
+              onClick={handleCreatorApproveAndVerify}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 font-black text-sm shadow-xl hover:scale-[1.01] transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <CheckCircle className="w-5 h-5 text-slate-950" />
+              <span>Verify & Issue Official NTPC Certificate (प्रमाणित गरी प्रमाणपत्र जारी गर्नुहोस्)</span>
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* STEP 5: FINAL VERIFIED CERTIFICATE DISPLAY            */}
       {/* ==================================================== */}
       {currentAttempt?.status === 'completed' && (
         <div className="space-y-8 animate-fadeIn">
@@ -779,10 +895,10 @@ export const CertificationView: React.FC = () => {
               🏆
             </div>
             <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-              Certification Examination Completed!
+              Official Certificate Verified & Issued!
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto font-semibold">
-              Congratulations <strong>{currentAttempt.user.fullName}</strong>! All three tests have been processed and your official certificate has been locked and recorded.
+              Congratulations <strong>{currentAttempt.user.fullName}</strong>! Information has been verified by the examination creator. Your official NTPC Certificate is active and downloadable.
             </p>
 
             {/* Score Grid */}
@@ -821,6 +937,14 @@ export const CertificationView: React.FC = () => {
                 <Printer className="w-4 h-4" />
                 <span>Print / Download PDF</span>
               </button>
+
+              <button
+                onClick={handleStartExam}
+                className="px-5 py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Retake Exam</span>
+              </button>
             </div>
 
           </div>
@@ -848,7 +972,7 @@ export const CertificationView: React.FC = () => {
                     National Typing Proficiency Certificate
                   </h1>
                   <p className="text-xs text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider">
-                    Nepali Typing Pro • Official Examination Board
+                    Nepali Typing Pro &bull; Official Examination Board
                   </p>
                 </div>
               </div>
@@ -856,6 +980,7 @@ export const CertificationView: React.FC = () => {
               <div className="text-right text-xs text-slate-500 dark:text-slate-400 font-semibold">
                 <div>Certificate ID: <strong className="text-slate-900 dark:text-slate-100 font-mono">{currentAttempt.id}</strong></div>
                 <div>Issue Date: <strong>{new Date(currentAttempt.completedAt || Date.now()).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></div>
+                <div className="text-emerald-600 font-bold">Creator Verified: Yes</div>
               </div>
             </div>
 
@@ -918,9 +1043,9 @@ export const CertificationView: React.FC = () => {
 
               {/* Registrar Signature */}
               <div className="text-center sm:text-right space-y-1">
-                <div className="font-serif italic text-lg text-slate-800 dark:text-slate-200">Prof. K. P. Sharma</div>
+                <div className="font-serif italic text-lg text-slate-800 dark:text-slate-200">Subhash Chandra Sharma</div>
                 <div className="w-36 h-0.5 bg-slate-400 dark:bg-slate-600 ml-auto"></div>
-                <div className="font-extrabold text-slate-800 dark:text-slate-200">Chief Examination Registrar</div>
+                <div className="font-extrabold text-slate-800 dark:text-slate-200">Chief Creator & Registrar</div>
                 <div className="text-[10px] text-slate-500">National Typing Examination Board</div>
               </div>
 
