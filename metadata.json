@@ -1,0 +1,6 @@
+{
+  "name": "Nepali Typing Pro",
+  "description": "Professional Romanized Nepali Unicode typing test, practice mode, legal vocabulary training, keyboard heatmap, and performance analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
