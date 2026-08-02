@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, CheckCircle2, RotateCcw, Sparkles, Award, Scale, RefreshCw, Play, Filter } from 'lucide-react';
+import { BookOpen, CheckCircle2, RotateCcw, Sparkles, Award, Scale, RefreshCw, Play, Filter, Keyboard as KeyboardIcon } from 'lucide-react';
 import { PRACTICE_MODULES, LEGAL_TERMS_PACK } from '../data/wordPacks';
 import { TestSettings, LegalTerm } from '../types';
 import { transliterateWordRuleBased } from '../utils/nepaliTransliteration';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
+import { NepaliRomanizedKeyboardDiagram } from './NepaliRomanizedKeyboardDiagram';
 
 interface PracticeModeProps {
   settings: TestSettings;
@@ -284,6 +285,17 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Official Nepali Romanized Unicode Keyboard Layout Reference Diagram */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center gap-2">
+          <KeyboardIcon className="w-5 h-5 text-amber-500" />
+          <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight">
+            Official Nepali Unicode Keyboard Layout (Romanized)
+          </h3>
+        </div>
+        <NepaliRomanizedKeyboardDiagram />
       </div>
 
     </div>
