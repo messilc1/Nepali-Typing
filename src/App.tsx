@@ -407,13 +407,35 @@ export default function App() {
       <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-8 text-xs text-slate-500 dark:text-slate-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
-            <div>
+            <div className="space-y-1">
               <div className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
                 Nepali Typing Pro
               </div>
-              <p className="text-slate-500 dark:text-slate-400 mt-0.5">
-                &copy; 2026 Nepali Typing Pro. All Rights Reserved. Created by <strong className="text-slate-800 dark:text-slate-200">Adv. Subhash Lamichhane</strong>.
+              <p className="text-slate-600 dark:text-slate-400 font-medium">
+                &copy; 2026 Nepali Typing Pro. All Rights Reserved.
               </p>
+              <p className="text-slate-700 dark:text-slate-300 font-bold">
+                Created by Adv. Subhash Lamichhane
+              </p>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                <a
+                  href="https://subhashlamichhane.com.np/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline flex items-center gap-1"
+                >
+                  <span>Website: https://subhashlamichhane.com.np/</span>
+                </a>
+                <span>&bull;</span>
+                <a
+                  href="https://www.linkedin.com/in/subhash-lamichhane/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline flex items-center gap-1"
+                >
+                  <span>LinkedIn: https://www.linkedin.com/in/subhash-lamichhane/</span>
+                </a>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 font-semibold text-slate-600 dark:text-slate-400">
