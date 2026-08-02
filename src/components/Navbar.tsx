@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Keyboard,
   BookOpen,
@@ -12,7 +12,9 @@ import {
   Maximize,
   Minimize,
   Award,
-  Info
+  Info,
+  Menu,
+  X
 } from 'lucide-react';
 import { NavigationTab, TestSettings, UserStats } from '../types';
 import { FontSelector } from './FontSelector';
@@ -38,6 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isFullscreen,
   toggleFullscreen
 }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const toggleLanguage = () => {
     updateSettings({
       language: settings.language === 'nepali' ? 'english' : 'nepali'
@@ -50,16 +54,23 @@ export const Navbar: React.FC<NavbarProps> = ({
     });
   };
 
+  const handleTabClick = (tab: NavigationTab) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <header id="main-navbar" className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
+    <header id="main-navbar" className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors w-full overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between min-h-[4.25rem] py-2 gap-3 flex-wrap md:flex-nowrap">
+        
+        {/* ROW 1: Brand & Utility Controls */}
+        <div className="flex items-center justify-between min-h-[4rem] py-2 gap-3 w-full">
           
           {/* Logo & Brand Title */}
           <div
             id="navbar-brand-logo"
             className="flex items-center gap-3 cursor-pointer shrink-0 select-none py-1"
-            onClick={() => setActiveTab('test')}
+            onClick={() => handleTabClick('test')}
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
               <Keyboard className="w-5 h-5" />
@@ -79,104 +90,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Center Navigation Tabs */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60 shrink-0">
-            <button
-              id="nav-tab-test"
-              onClick={() => setActiveTab('test')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'test'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Keyboard className="w-4 h-4" />
-              <span>Typing Test</span>
-            </button>
-
-            <button
-              id="nav-tab-practice"
-              onClick={() => setActiveTab('practice')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'practice'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>Practice Mode</span>
-            </button>
-
-            <button
-              id="nav-tab-legal"
-              onClick={() => setActiveTab('legal')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'legal'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Scale className="w-4 h-4 text-indigo-500" />
-              <span>Legal Pack</span>
-              <span className="text-[10px] bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
-                Lok Sewa
-              </span>
-            </button>
-
-            <button
-              id="nav-tab-analytics"
-              onClick={() => setActiveTab('analytics')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'analytics'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Analytics</span>
-            </button>
-
-            <button
-              id="nav-tab-certification"
-              onClick={() => setActiveTab('certification')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'certification'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
-                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-800'
-              }`}
-            >
-              <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>🏆 Certification Test</span>
-            </button>
-
-            <button
-              id="nav-tab-about"
-              onClick={() => setActiveTab('about')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'about'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Info className="w-4 h-4" />
-              <span>About</span>
-            </button>
-          </nav>
-
-          {/* Right Controls & Speed Engine Switchers */}
-          <div className="flex items-center gap-2 shrink-0 ml-auto md:ml-0">
+          {/* Right Utility Controls */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
             
             {/* Streak Counter */}
             <div
               id="navbar-streak-badge"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-amber-700 dark:text-amber-400 font-extrabold text-xs whitespace-nowrap shrink-0"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-amber-700 dark:text-amber-400 font-extrabold text-xs whitespace-nowrap shrink-0"
             >
               <Flame className="w-4 h-4 text-amber-500 fill-amber-500 animate-pulse" />
               <span>{userStats.currentStreakDays}d Streak</span>
             </div>
 
             {/* Font Selector Dropdown */}
-            <div className="shrink-0">
+            <div className="shrink-0 max-w-[130px] sm:max-w-none">
               <FontSelector
                 currentFont={settings.fontFamily}
                 onSelectFont={(fontId) => updateSettings({ fontFamily: fontId })}
@@ -189,11 +116,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="btn-language-toggle"
               onClick={toggleLanguage}
               title="Press Ctrl + Space to toggle language"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-bold transition-all shadow-sm whitespace-nowrap shrink-0 cursor-pointer"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-bold transition-all shadow-sm whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Globe className="w-3.5 h-3.5 text-blue-600" />
-              <span>
-                {settings.language === 'nepali' ? '🇳🇵 Nepali Unicode' : '🇬🇧 English'}
+              <span className="text-xs">
+                {settings.language === 'nepali' ? '🇳🇵 Nepali' : '🇬🇧 English'}
               </span>
               <kbd className="hidden xl:inline-block text-[10px] bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 font-mono text-slate-500">
                 Ctrl+Space
@@ -234,79 +161,198 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Settings className="w-4 h-4" />
             </button>
 
+            {/* Mobile Hamburger Menu Button */}
+            <button
+              id="btn-mobile-menu"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              title="Toggle Menu"
+              className="md:hidden p-2 h-9 w-9 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5 text-blue-600" /> : <Menu className="w-5 h-5" />}
+            </button>
+
           </div>
 
         </div>
 
-        {/* Medium and Small Nav Row (Below lg screens) */}
-        <div className="flex lg:hidden items-center justify-start gap-1 py-2 border-t border-slate-200/60 dark:border-slate-800/60 text-xs font-semibold overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => setActiveTab('test')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'test'
-                ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <Keyboard className="w-3.5 h-3.5" />
-            <span>Typing Test</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('practice')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'practice'
-                ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Practice Mode</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('legal')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'legal'
-                ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Legal Pack</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'analytics'
-                ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Analytics</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('certification')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'certification'
-                ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
-                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'
-            }`}
-          >
-            <Award className="w-3.5 h-3.5 text-amber-600" />
-            <span>🏆 Certification</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('about')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
-              activeTab === 'about'
-                ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
-                : 'text-slate-600 dark:text-slate-400'
-            }`}
-          >
-            <Info className="w-3.5 h-3.5" />
-            <span>About</span>
-          </button>
+        {/* ROW 2: Primary Navigation Tabs (Desktop & Tablet Layout) */}
+        <div className="hidden md:flex items-center justify-center py-2 border-t border-slate-200/60 dark:border-slate-800/60 w-full">
+          <nav className="flex items-center justify-center flex-wrap gap-1 sm:gap-1.5 bg-slate-100/90 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 max-w-full">
+            
+            <button
+              id="nav-tab-test"
+              onClick={() => handleTabClick('test')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'test'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Keyboard className="w-4 h-4" />
+              <span>Typing Test</span>
+            </button>
+
+            <button
+              id="nav-tab-practice"
+              onClick={() => handleTabClick('practice')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'practice'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Practice Mode</span>
+            </button>
+
+            <button
+              id="nav-tab-legal"
+              onClick={() => handleTabClick('legal')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'legal'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Scale className="w-4 h-4 text-indigo-500" />
+              <span>Legal Pack</span>
+              <span className="text-[10px] bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
+                Lok Sewa
+              </span>
+            </button>
+
+            <button
+              id="nav-tab-analytics"
+              onClick={() => handleTabClick('analytics')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'analytics'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Analytics</span>
+            </button>
+
+            <button
+              id="nav-tab-certification"
+              onClick={() => handleTabClick('certification')}
+              className={`flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'certification'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-800'
+              }`}
+            >
+              <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>🏆 Certification Test</span>
+            </button>
+
+            <button
+              id="nav-tab-about"
+              onClick={() => handleTabClick('about')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'about'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Info className="w-4 h-4" />
+              <span>About</span>
+            </button>
+
+          </nav>
         </div>
+
+        {/* Mobile Dropdown Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="md:hidden py-3 border-t border-slate-200 dark:border-slate-800 space-y-2 animate-fadeIn w-full">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleTabClick('test')}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeTab === 'test'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800 font-extrabold'
+                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Keyboard className="w-4 h-4 text-blue-500" />
+                <span>Typing Test</span>
+              </button>
+
+              <button
+                onClick={() => handleTabClick('practice')}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeTab === 'practice'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800 font-extrabold'
+                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <BookOpen className="w-4 h-4 text-blue-500" />
+                <span>Practice Mode</span>
+              </button>
+
+              <button
+                onClick={() => handleTabClick('legal')}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeTab === 'legal'
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 font-extrabold'
+                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Scale className="w-4 h-4 text-indigo-500" />
+                <span>Legal Pack</span>
+              </button>
+
+              <button
+                onClick={() => handleTabClick('analytics')}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeTab === 'analytics'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800 font-extrabold'
+                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4 text-blue-500" />
+                <span>Analytics</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => handleTabClick('certification')}
+                className={`col-span-1 flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  activeTab === 'certification'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                }`}
+              >
+                <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>🏆 Certification</span>
+              </button>
+
+              <button
+                onClick={() => handleTabClick('about')}
+                className={`col-span-1 flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeTab === 'about'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800 font-extrabold'
+                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Info className="w-4 h-4 text-blue-500" />
+                <span>About</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 mt-2">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-extrabold text-xs">
+                <Flame className="w-4 h-4 text-amber-500 fill-amber-500" />
+                <span>Daily Streak</span>
+              </div>
+              <span className="font-black text-xs text-amber-700 dark:text-amber-400 bg-amber-200/60 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
+                {userStats.currentStreakDays} Days
+              </span>
+            </div>
+          </div>
+        )}
 
       </div>
     </header>
