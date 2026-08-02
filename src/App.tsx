@@ -9,6 +9,7 @@ import { PracticeMode } from './components/PracticeMode';
 import { LegalPackView } from './components/LegalPackView';
 import { HistoryAnalytics } from './components/HistoryAnalytics';
 import { CertificationView } from './components/CertificationView';
+import { AboutView } from './components/AboutView';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
 
@@ -76,8 +77,42 @@ export default function App() {
     return INITIAL_USER_STATS;
   });
 
-  // Navigation & Modals State
-  const [activeTab, setActiveTab] = useState<NavigationTab>('test');
+  // Navigation & Modals State - Tab Persistence Logic
+  const [activeTab, setActiveTabState] = useState<NavigationTab>(() => {
+    try {
+      const hash = window.location.hash.replace('#', '');
+      if (['test', 'practice', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+        return hash as NavigationTab;
+      }
+      const saved = localStorage.getItem('nepali_typing_active_tab');
+      if (saved && ['test', 'practice', 'legal', 'analytics', 'certification', 'about'].includes(saved)) {
+        return saved as NavigationTab;
+      }
+    } catch {}
+    return 'test';
+  });
+
+  const setActiveTab = useCallback((tab: NavigationTab) => {
+    setActiveTabState(tab);
+    try {
+      localStorage.setItem('nepali_typing_active_tab', tab);
+      if (window.location.hash.replace('#', '') !== tab) {
+        window.history.replaceState(null, '', `#${tab}`);
+      }
+    } catch {}
+  }, []);
+
+  // Sync hash changes if user uses browser Back/Forward
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['test', 'practice', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+        setActiveTabState(hash as NavigationTab);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showCustomParagraphModal, setShowCustomParagraphModal] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -362,19 +397,48 @@ export default function App() {
           <CertificationView />
         )}
 
+        {activeTab === 'about' && (
+          <AboutView onNavigateTab={setActiveTab} />
+        )}
+
       </main>
 
       {/* Footer */}
-      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            <strong>Nepali Typing Pro</strong> • Intelligent Romanized Unicode Engine & Speed Trainer
-          </span>
-          <span className="flex items-center gap-3">
-            <span>Press <kbd className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-slate-300 dark:border-slate-700">Ctrl + Space</kbd> to toggle Language</span>
-            <span>•</span>
-            <span>Offline Ready</span>
-          </span>
+      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-8 text-xs text-slate-500 dark:text-slate-400">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+            <div>
+              <div className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
+                Nepali Typing Pro
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 mt-0.5">
+                &copy; 2026 Nepali Typing Pro. All Rights Reserved. Created by <strong className="text-slate-800 dark:text-slate-200">Adv. Subhash Lamichhane</strong>.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 font-semibold text-slate-600 dark:text-slate-400">
+              <button onClick={() => setActiveTab('test')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Typing Test</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('practice')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Practice Mode</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('legal')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Legal Pack</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('analytics')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Analytics</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('certification')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Certification</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('about')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">About</button>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
+            <span>Standardized Devanagari Unicode Assessment & Certification Engine</span>
+            <span className="flex items-center gap-2">
+              <span>Press <kbd className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700">Ctrl + Space</kbd> to toggle language</span>
+              <span>&bull;</span>
+              <span>v2.5.0</span>
+            </span>
+          </div>
         </div>
       </footer>
 

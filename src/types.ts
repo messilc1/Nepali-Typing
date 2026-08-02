@@ -1,4 +1,4 @@
-export type NavigationTab = 'test' | 'practice' | 'legal' | 'analytics' | 'certification';
+export type NavigationTab = 'test' | 'practice' | 'legal' | 'analytics' | 'certification' | 'about';
 
 export type LanguageMode = 'nepali' | 'english';
 

@@ -11,7 +11,8 @@ import {
   Globe,
   Maximize,
   Minimize,
-  Award
+  Award,
+  Info
 } from 'lucide-react';
 import { NavigationTab, TestSettings, UserStats } from '../types';
 import { FontSelector } from './FontSelector';
@@ -147,6 +148,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Award className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>🏆 Certification Test</span>
             </button>
+
+            <button
+              id="nav-tab-about"
+              onClick={() => setActiveTab('about')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'about'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Info className="w-4 h-4" />
+              <span>About</span>
+            </button>
           </nav>
 
           {/* Right Controls & Speed Engine Switchers */}
@@ -280,6 +294,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Award className="w-3.5 h-3.5 text-amber-600" />
             <span>🏆 Certification</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('about')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap cursor-pointer ${
+              activeTab === 'about'
+                ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-extrabold'
+                : 'text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            <Info className="w-3.5 h-3.5" />
+            <span>About</span>
           </button>
         </div>
 
