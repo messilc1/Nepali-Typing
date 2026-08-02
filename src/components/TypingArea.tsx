@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useMemo, useCallback } from 'react';
 import {
   RotateCcw,
   Clock,
@@ -13,7 +13,7 @@ import {
   Lightbulb,
   HelpCircle
 } from 'lucide-react';
-import { TestSettings, TestResult, KeyStats } from '../types';
+import { TestSettings, TestResult, KeyStats, LiveStats } from '../types';
 import { transliterateWordRuleBased, getWordSuggestions, getRomanizedHintForWord } from '../utils/nepaliTransliteration';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
@@ -28,6 +28,7 @@ interface TypingAreaProps {
   onOpenCustomParagraph: () => void;
   onKeypressMetric: (key: string, isCorrect: boolean, latencyMs: number) => void;
   onNextHintKeyChange?: (key: string | undefined) => void;
+  onLiveStatsChange?: (stats: LiveStats) => void;
 }
 
 export interface TypingAreaRef {
@@ -43,7 +44,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   onRestartTest,
   onOpenCustomParagraph,
   onKeypressMetric,
-  onNextHintKeyChange
+  onNextHintKeyChange,
+  onLiveStatsChange
 }, ref) => {
   // Input state
   const [typedInput, setTypedInput] = useState<string>(''); // For current word in Romanized mode or full text
@@ -65,6 +67,16 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const [mistakesCount, setMistakesCount] = useState<number>(0);
   const [backspacesCount, setBackspacesCount] = useState<number>(0);
 
+  // Sync Refs to avoid stale closures in interval & callbacks
+  const typedInputRef = useRef<string>('');
+  const typedHistoryRef = useRef<string[]>([]);
+  const currentWordIndexRef = useRef<number>(0);
+  const mistakesCountRef = useRef<number>(0);
+  const backspacesCountRef = useRef<number>(0);
+  const startTimeRef = useRef<number | null>(null);
+  const isTestRunningRef = useRef<boolean>(false);
+  const isTestFinishedRef = useRef<boolean>(false);
+
   // Key tracking metrics
   const keyStatsRef = useRef<Record<string, KeyStats>>({});
   const mistypedWordsRef = useRef<Record<string, number>>({});
@@ -77,7 +89,95 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const targetWords = targetText.trim().split(/\s+/).filter(Boolean);
+  const targetWords = useMemo(() => targetText.trim().split(/\s+/).filter(Boolean), [targetText]);
+
+  // Compute live statistics helper
+  const computeLiveStats = useCallback((overrideElapsedSec?: number): LiveStats => {
+    const words = targetWords;
+    const history = typedHistoryRef.current;
+    const curIdx = currentWordIndexRef.current;
+    const input = typedInputRef.current;
+    const mistakes = mistakesCountRef.current;
+    const backspaces = backspacesCountRef.current;
+    const start = startTimeRef.current;
+
+    const now = Date.now();
+    const timeSpentSec = start
+      ? Math.max(0.1, (now - start) / 1000)
+      : (overrideElapsedSec ?? 0);
+    
+    const elapsedSec = overrideElapsedSec ?? Math.floor(timeSpentSec);
+
+    let correctChars = 0;
+    let wrongChars = 0;
+    let correctWords = 0;
+    let wrongWords = 0;
+
+    words.forEach((word, idx) => {
+      const typed = history[idx] || (idx === curIdx ? input : '');
+      if (!typed) return;
+
+      if (typed === word) {
+        if (idx < curIdx) {
+          correctWords++;
+          correctChars += word.length + 1; // +1 for space
+        } else {
+          correctChars += word.length;
+        }
+      } else {
+        if (idx < curIdx) {
+          wrongWords++;
+        }
+        const maxLen = Math.max(word.length, typed.length);
+        for (let i = 0; i < maxLen; i++) {
+          if (i < typed.length && i < word.length && typed[i] === word[i]) {
+            correctChars++;
+          } else if (i < typed.length) {
+            wrongChars++;
+          }
+        }
+      }
+    });
+
+    const totalCharsTyped = correctChars + wrongChars;
+    const minutes = timeSpentSec > 0 ? Math.max(1 / 60, timeSpentSec / 60) : 1 / 60;
+    
+    const grossWpm = start && timeSpentSec > 0 ? Math.round((totalCharsTyped / 5) / minutes) : 0;
+    const netWpm = start && timeSpentSec > 0 ? Math.max(0, Math.round(((correctChars - wrongChars) / 5) / minutes)) : 0;
+    const accuracy = totalCharsTyped > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalCharsTyped) * 100))) : 100;
+
+    let remainingSec: number | null = null;
+    if (settings.testType === 'time' && settings.durationSeconds > 0) {
+      remainingSec = Math.max(0, settings.durationSeconds - elapsedSec);
+    }
+
+    const samples = wpmSamplesRef.current.map(s => s.wpm);
+    let consistency = 90;
+    if (samples.length > 1) {
+      const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+      const variance = samples.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / samples.length;
+      const stdDev = Math.sqrt(variance);
+      consistency = Math.max(50, Math.min(100, Math.round(100 - (stdDev / (mean || 1)) * 50)));
+    }
+
+    return {
+      grossWpm,
+      netWpm,
+      accuracy,
+      elapsedSeconds: elapsedSec,
+      remainingSeconds: remainingSec,
+      totalWords: words.length,
+      completedWordsCount: history.length,
+      mistakesCount: mistakes,
+      backspacesCount: backspaces,
+      totalCharactersTyped: totalCharsTyped,
+      correctCharacters: correctChars,
+      wrongCharacters: wrongChars,
+      correctWords,
+      wrongWords,
+      consistency
+    };
+  }, [targetWords, settings.testType, settings.durationSeconds]);
 
   // Typing Hint Calculation - Fully Dynamic Real-Time Engine
   const currentTargetWord = targetWords[currentWordIndex] || '';
@@ -158,12 +258,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     inputRef.current?.focus();
   }, [targetText, settings.language]);
 
-  // Reset state when targetText or settings change
-  useEffect(() => {
-    resetState();
-  }, [targetText, settings.language, settings.testType, settings.durationSeconds, settings.wordCount]);
-
-  const resetState = () => {
+  const resetState = useCallback(() => {
     setTypedInput('');
     setTypedHistory([]);
     setCurrentWordIndex(0);
@@ -176,54 +271,57 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     setKeystrokes(0);
     setMistakesCount(0);
     setBackspacesCount(0);
+
+    typedInputRef.current = '';
+    typedHistoryRef.current = [];
+    currentWordIndexRef.current = 0;
+    mistakesCountRef.current = 0;
+    backspacesCountRef.current = 0;
+    startTimeRef.current = null;
+    isTestRunningRef.current = false;
+    isTestFinishedRef.current = false;
+
     keyStatsRef.current = {};
     mistypedWordsRef.current = {};
     mistypedCharsRef.current = {};
     lastKeyTimeRef.current = null;
     wpmSamplesRef.current = [];
-  };
 
-  // Timer logic
+    onLiveStatsChange?.({
+      grossWpm: 0,
+      netWpm: 0,
+      accuracy: 100,
+      elapsedSeconds: 0,
+      remainingSeconds: settings.testType === 'time' ? settings.durationSeconds : null,
+      totalWords: targetWords.length,
+      completedWordsCount: 0,
+      mistakesCount: 0,
+      backspacesCount: 0,
+      totalCharactersTyped: 0,
+      correctCharacters: 0,
+      wrongCharacters: 0,
+      correctWords: 0,
+      wrongWords: 0,
+      consistency: 100
+    });
+  }, [targetWords, settings.testType, settings.durationSeconds, onLiveStatsChange]);
+
+  // Reset state when targetText or settings change
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isTestRunning && !isTestFinished && startTime !== null) {
-      interval = setInterval(() => {
-        const now = Date.now();
-        const seconds = Math.floor((now - startTime) / 1000);
-        setElapsedSeconds(seconds);
-
-        // Record WPM sample for graph every second
-        const totalCharsTyped = typedHistory.join(' ').length + typedInput.length;
-        const grossWpmSample = seconds > 0 ? Math.round((totalCharsTyped / 5) / (seconds / 60)) : 0;
-        const netWpmSample = seconds > 0 ? Math.max(0, Math.round(((totalCharsTyped - mistakesCount * 5) / 5) / (seconds / 60))) : 0;
-
-        wpmSamplesRef.current.push({
-          second: seconds,
-          wpm: netWpmSample,
-          rawWpm: grossWpmSample,
-          errors: mistakesCount
-        });
-
-        // Time-based test completion check
-        if (settings.testType === 'time' && settings.durationSeconds > 0) {
-          if (seconds >= settings.durationSeconds) {
-            finishTest(seconds);
-          }
-        }
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isTestRunning, isTestFinished, startTime, typedHistory, typedInput, mistakesCount, settings.testType, settings.durationSeconds]);
+    resetState();
+  }, [targetText, settings.language, settings.testType, settings.durationSeconds, settings.wordCount, resetState]);
 
   // Finish test and calculate full statistics
-  const finishTest = (finalElapsedSec?: number) => {
-    if (isTestFinished) return;
+  const finishTest = useCallback((finalElapsedSec?: number) => {
+    if (isTestFinishedRef.current) return;
+    isTestFinishedRef.current = true;
+    isTestRunningRef.current = false;
     setIsTestFinished(true);
     setIsTestRunning(false);
 
-    const timeSpent = Math.max(1, finalElapsedSec ?? elapsedSeconds);
+    const now = Date.now();
+    const start = startTimeRef.current || now;
+    const timeSpent = Math.max(1, finalElapsedSec ?? Math.floor((now - start) / 1000));
 
     // Calculate metrics
     let correctChars = 0;
@@ -231,20 +329,29 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     let correctWords = 0;
     let wrongWords = 0;
 
+    const history = typedHistoryRef.current;
+    const curWordIdx = currentWordIndexRef.current;
+    const activeInput = typedInputRef.current;
+
     targetWords.forEach((word, idx) => {
-      const typed = typedHistory[idx] || (idx === currentWordIndex ? typedInput : '');
+      const typed = history[idx] || (idx === curWordIdx ? activeInput : '');
       if (!typed) return;
 
       if (typed === word) {
-        correctWords++;
-        correctChars += word.length + 1; // +1 for space
+        if (idx < curWordIdx) {
+          correctWords++;
+          correctChars += word.length + 1; // +1 for space
+        } else {
+          correctChars += word.length;
+        }
       } else {
-        wrongWords++;
-        // Compare char by char
+        if (idx < curWordIdx) {
+          wrongWords++;
+        }
         for (let i = 0; i < Math.max(word.length, typed.length); i++) {
-          if (typed[i] === word[i]) {
+          if (i < typed.length && i < word.length && typed[i] === word[i]) {
             correctChars++;
-          } else {
+          } else if (i < typed.length) {
             wrongChars++;
           }
         }
@@ -252,9 +359,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     });
 
     const totalTypedChars = correctChars + wrongChars;
-    const grossWpm = Math.round((totalTypedChars / 5) / (timeSpent / 60));
-    const netWpm = Math.max(0, Math.round(((correctChars - wrongChars) / 5) / (timeSpent / 60)));
-    const accuracy = totalTypedChars > 0 ? Math.min(100, Math.round((correctChars / totalTypedChars) * 100)) : 100;
+    const minutes = Math.max(1 / 60, timeSpent / 60);
+    const grossWpm = Math.round((totalTypedChars / 5) / minutes);
+    const netWpm = Math.max(0, Math.round(((correctChars - wrongChars) / 5) / minutes));
+    const accuracy = totalTypedChars > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalTypedChars) * 100))) : 100;
 
     let performanceGrade: 'Excellent' | 'Good' | 'Average' | 'Needs Improvement' = 'Average';
     if (netWpm >= 50 && accuracy >= 95) performanceGrade = 'Excellent';
@@ -285,14 +393,14 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       totalCharactersTyped: totalTypedChars,
       correctCharacters: correctChars,
       wrongCharacters: wrongChars,
-      totalWordsTyped: typedHistory.length,
+      totalWordsTyped: history.length,
       correctWords,
       wrongWords,
-      mistakesCount,
-      backspacesCount,
+      mistakesCount: mistakesCountRef.current,
+      backspacesCount: backspacesCountRef.current,
       consistencyPercent: consistency,
       performanceGrade,
-      wpmOverTime: wpmSamplesRef.current.length > 0 ? wpmSamplesRef.current : [{ second: timeSpent, wpm: netWpm, rawWpm: grossWpm, errors: mistakesCount }],
+      wpmOverTime: wpmSamplesRef.current.length > 0 ? wpmSamplesRef.current : [{ second: timeSpent, wpm: netWpm, rawWpm: grossWpm, errors: mistakesCountRef.current }],
       keyStatsMap: keyStatsRef.current,
       mistypedWordsMap: mistypedWordsRef.current,
       mistypedCharsMap: mistypedCharsRef.current,
@@ -314,11 +422,47 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     };
 
     onTestComplete(resultObj);
-  };
+  }, [targetText, targetWords, settings, passageTitle, onTestComplete]);
+
+  // Clean, responsive Timer logic (Independent of keystroke updates)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isTestRunning && !isTestFinished && startTime !== null) {
+      interval = setInterval(() => {
+        const now = Date.now();
+        const seconds = Math.floor((now - startTime) / 1000);
+        setElapsedSeconds(seconds);
+
+        const live = computeLiveStats(seconds);
+        onLiveStatsChange?.(live);
+
+        // Record WPM sample for graph every second
+        const lastSampleSecond = wpmSamplesRef.current.length > 0 ? wpmSamplesRef.current[wpmSamplesRef.current.length - 1].second : -1;
+        if (seconds > lastSampleSecond) {
+          wpmSamplesRef.current.push({
+            second: seconds,
+            wpm: live.netWpm,
+            rawWpm: live.grossWpm,
+            errors: live.mistakesCount
+          });
+        }
+
+        // Time-based test completion check
+        if (settings.testType === 'time' && settings.durationSeconds > 0) {
+          if (seconds >= settings.durationSeconds) {
+            finishTest(settings.durationSeconds);
+          }
+        }
+      }, 200);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isTestRunning, isTestFinished, startTime, settings.testType, settings.durationSeconds, computeLiveStats, finishTest, onLiveStatsChange]);
 
   // Handle Keystrokes & Romanized Conversion
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isTestFinished) return;
+    if (isTestFinishedRef.current) return;
 
     // Shortcuts
     if (e.ctrlKey && e.code === 'Space') {
@@ -341,10 +485,13 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       return;
     }
 
-    // Start timer on first keystroke
-    if (!isTestRunning) {
+    // Start timer on FIRST valid keystroke
+    if (!isTestRunningRef.current) {
+      const now = Date.now();
+      isTestRunningRef.current = true;
       setIsTestRunning(true);
-      setStartTime(Date.now());
+      startTimeRef.current = now;
+      setStartTime(now);
     }
 
     // Sound feedback
@@ -353,7 +500,11 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     lastKeyTimeRef.current = now;
 
     if (e.key === 'Backspace') {
-      setBackspacesCount(prev => prev + 1);
+      setBackspacesCount(prev => {
+        const next = prev + 1;
+        backspacesCountRef.current = next;
+        return next;
+      });
       playKeypressSound(settings.sound, settings.soundVolume);
 
       if (settings.language === 'nepali') {
@@ -362,17 +513,51 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           setRomanBuffer(newBuf);
           const converted = transliterateWordRuleBased(newBuf);
           setTypedInput(converted);
+          typedInputRef.current = converted;
           setActiveSuggestions(getWordSuggestions(newBuf));
         } else if (typedInput.length > 0) {
-          setTypedInput(prev => prev.slice(0, -1));
+          const newTyped = typedInput.slice(0, -1);
+          setTypedInput(newTyped);
+          typedInputRef.current = newTyped;
         } else if (currentWordIndex > 0) {
           // Move back to previous word
           const prevIdx = currentWordIndex - 1;
           setCurrentWordIndex(prevIdx);
-          setTypedInput(typedHistory[prevIdx] || '');
-          setTypedHistory(prev => prev.slice(0, -1));
+          currentWordIndexRef.current = prevIdx;
+
+          const prevTyped = typedHistory[prevIdx] || '';
+          setTypedInput(prevTyped);
+          typedInputRef.current = prevTyped;
+
+          setTypedHistory(prev => {
+            const next = prev.slice(0, -1);
+            typedHistoryRef.current = next;
+            return next;
+          });
+        }
+      } else {
+        if (typedInput.length > 0) {
+          const newTyped = typedInput.slice(0, -1);
+          setTypedInput(newTyped);
+          typedInputRef.current = newTyped;
+        } else if (currentWordIndex > 0) {
+          const prevIdx = currentWordIndex - 1;
+          setCurrentWordIndex(prevIdx);
+          currentWordIndexRef.current = prevIdx;
+
+          const prevTyped = typedHistory[prevIdx] || '';
+          setTypedInput(prevTyped);
+          typedInputRef.current = prevTyped;
+
+          setTypedHistory(prev => {
+            const next = prev.slice(0, -1);
+            typedHistoryRef.current = next;
+            return next;
+          });
         }
       }
+
+      onLiveStatsChange?.(computeLiveStats());
       return;
     }
 
@@ -386,7 +571,11 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
       // Track accuracy and mistakes
       if (finalWord !== currentTargetWord) {
-        setMistakesCount(prev => prev + 1);
+        setMistakesCount(prev => {
+          const next = prev + 1;
+          mistakesCountRef.current = next;
+          return next;
+        });
         playErrorSound(settings.soundVolume);
         mistypedWordsRef.current[currentTargetWord] = (mistypedWordsRef.current[currentTargetWord] || 0) + 1;
       } else {
@@ -398,12 +587,20 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       onKeypressMetric(keyKey, finalWord === currentTargetWord, latency);
 
       // Commit word
-      setTypedHistory(prev => [...prev, finalWord]);
+      const nextHistory = [...typedHistory, finalWord];
+      typedHistoryRef.current = nextHistory;
+      setTypedHistory(nextHistory);
+
       const nextWordIdx = currentWordIndex + 1;
+      currentWordIndexRef.current = nextWordIdx;
       setCurrentWordIndex(nextWordIdx);
+
       setTypedInput('');
+      typedInputRef.current = '';
       setRomanBuffer('');
       setActiveSuggestions([]);
+
+      onLiveStatsChange?.(computeLiveStats());
 
       // Check for Word count completion or end of passage
       if (
@@ -425,10 +622,15 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         setRomanBuffer(newBuf);
         const converted = transliterateWordRuleBased(newBuf);
         setTypedInput(converted);
+        typedInputRef.current = converted;
         setActiveSuggestions(getWordSuggestions(newBuf));
       } else {
-        setTypedInput(prev => prev + e.key);
+        const newTyped = typedInput + e.key;
+        setTypedInput(newTyped);
+        typedInputRef.current = newTyped;
       }
+
+      onLiveStatsChange?.(computeLiveStats());
     }
   };
 
@@ -534,7 +736,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         <div className="flex items-center gap-2 text-xs">
           {settings.testType === 'time' && (
             <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
-              {[15, 30, 60, 120, 300].map(sec => (
+              {[15, 30, 60, 120, 180, 300, 600].map(sec => (
                 <button
                   key={sec}
                   onClick={() => updateSettings({ durationSeconds: sec })}

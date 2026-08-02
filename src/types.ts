@@ -1,3 +1,21 @@
+export interface LiveStats {
+  grossWpm: number;
+  netWpm: number;
+  accuracy: number;
+  elapsedSeconds: number;
+  remainingSeconds: number | null;
+  totalWords: number;
+  completedWordsCount: number;
+  mistakesCount: number;
+  backspacesCount: number;
+  totalCharactersTyped: number;
+  correctCharacters: number;
+  wrongCharacters: number;
+  correctWords: number;
+  wrongWords: number;
+  consistency: number;
+}
+
 export type NavigationTab = 'test' | 'practice' | 'legal' | 'analytics' | 'certification' | 'about';
 
 export type LanguageMode = 'nepali' | 'english';

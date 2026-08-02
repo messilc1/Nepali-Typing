@@ -13,7 +13,7 @@ import { AboutView } from './components/AboutView';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
 
-import { TestSettings, TestResult, UserStats, KeyStats, NavigationTab } from './types';
+import { TestSettings, TestResult, UserStats, KeyStats, LiveStats, NavigationTab } from './types';
 import { applyGlobalNepaliFont, getStoredNepaliFont } from './utils/fonts';
 import {
   NEPALI_WORDS_EASY,
@@ -122,6 +122,25 @@ export default function App() {
   const [isPersonalBest, setIsPersonalBest] = useState<boolean>(false);
   const [targetText, setTargetText] = useState<string>('');
   const [activePassageTitle, setActivePassageTitle] = useState<string | undefined>(undefined);
+  
+  // Realtime Live Stats State
+  const [liveStats, setLiveStats] = useState<LiveStats>({
+    grossWpm: 0,
+    netWpm: 0,
+    accuracy: 100,
+    elapsedSeconds: 0,
+    remainingSeconds: settings.testType === 'time' ? settings.durationSeconds : null,
+    totalWords: 0,
+    completedWordsCount: 0,
+    mistakesCount: 0,
+    backspacesCount: 0,
+    totalCharactersTyped: 0,
+    correctCharacters: 0,
+    wrongCharacters: 0,
+    correctWords: 0,
+    wrongWords: 0,
+    consistency: 100
+  });
   
   // Realtime Key Heatmap Metrics State
   const [keyStatsMap, setKeyStatsMap] = useState<Record<string, KeyStats>>({});
@@ -311,15 +330,15 @@ export default function App() {
             
             {/* Live Stats Bar */}
             <LiveStatsBar
-              grossWpm={activeResult ? activeResult.grossWpm : 0}
-              netWpm={activeResult ? activeResult.netWpm : 0}
-              accuracy={activeResult ? activeResult.accuracy : 100}
-              elapsedSeconds={0}
-              remainingSeconds={settings.testType === 'time' ? settings.durationSeconds : null}
-              totalWords={targetText.trim().split(/\s+/).length}
-              completedWordsCount={0}
-              mistakesCount={0}
-              backspacesCount={0}
+              grossWpm={activeResult ? activeResult.grossWpm : liveStats.grossWpm}
+              netWpm={activeResult ? activeResult.netWpm : liveStats.netWpm}
+              accuracy={activeResult ? activeResult.accuracy : liveStats.accuracy}
+              elapsedSeconds={activeResult ? activeResult.elapsedSeconds : liveStats.elapsedSeconds}
+              remainingSeconds={activeResult ? null : liveStats.remainingSeconds}
+              totalWords={liveStats.totalWords || targetText.trim().split(/\s+/).filter(Boolean).length}
+              completedWordsCount={activeResult ? activeResult.totalWordsTyped : liveStats.completedWordsCount}
+              mistakesCount={activeResult ? activeResult.mistakesCount : liveStats.mistakesCount}
+              backspacesCount={activeResult ? activeResult.backspacesCount : liveStats.backspacesCount}
               settings={settings}
             />
 
@@ -347,6 +366,7 @@ export default function App() {
                 onOpenCustomParagraph={() => setShowCustomParagraphModal(true)}
                 onKeypressMetric={handleKeypressMetric}
                 onNextHintKeyChange={handleNextHintKeyChange}
+                onLiveStatsChange={setLiveStats}
               />
             )}
 

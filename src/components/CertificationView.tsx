@@ -83,6 +83,7 @@ export const CertificationView: React.FC = () => {
 
   const [activeTestIndex, setActiveTestIndex] = useState<number>(1); // 1, 2, 3
   const [isExamRunning, setIsExamRunning] = useState<boolean>(false);
+  const [isExamStarted, setIsExamStarted] = useState<boolean>(false);
   const [typedInput, setTypedInput] = useState<string>('');
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [backspaceCount, setBackspaceCount] = useState<number>(0);
@@ -176,13 +177,10 @@ export const CertificationView: React.FC = () => {
     setTypedInput('');
     setElapsedSeconds(0);
     setBackspaceCount(0);
-    setIsExamRunning(true);
-    startTimeRef.current = Date.now();
+    setIsExamRunning(false);
+    setIsExamStarted(false);
 
     if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
-    }, 1000);
 
     setTimeout(() => {
       inputRef.current?.focus();
@@ -235,8 +233,17 @@ export const CertificationView: React.FC = () => {
 
   // Handle Input Typing
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (!isExamRunning) return;
     const rawValue = e.target.value;
+    if (!isExamStarted && rawValue.length > 0) {
+      setIsExamStarted(true);
+      setIsExamRunning(true);
+      startTimeRef.current = Date.now();
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    }
+
     const parsedValue = transliterateRomanToNepali(rawValue);
     setTypedInput(parsedValue);
 
