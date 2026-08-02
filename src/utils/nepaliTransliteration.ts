@@ -396,3 +396,121 @@ export function getWordSuggestions(romanWord: string): string[] {
 
   return suggestions;
 }
+
+// Build reverse dictionary for fast 100% accurate lookups
+const REVERSE_DICTIONARY: Record<string, string> = {};
+Object.entries(COMMON_DICTIONARY).forEach(([roman, devanagari]) => {
+  if (!REVERSE_DICTIONARY[devanagari]) {
+    REVERSE_DICTIONARY[devanagari] = roman;
+  }
+});
+
+const DEVANAGARI_CONSONANTS: Record<string, string> = {
+  'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'ng',
+  'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'yn',
+  'ट': 'T', 'ठ': 'Th', 'ड': 'D', 'ढ': 'Dh', 'ण': 'N',
+  'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n',
+  'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm',
+  'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v', 'श': 'sh', 'ष': 'Sh', 'स': 's', 'ह': 'h',
+  'क्ष': 'ksh', 'त्र': 'tr', 'ज्ञ': 'gy', 'श्र': 'shr'
+};
+
+const DEVANAGARI_INDEPENDENT_VOWELS: Record<string, string> = {
+  'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'ऋ': 'ri', 'अं': 'am', 'अः': 'ah'
+};
+
+const DEVANAGARI_VOWEL_MATRAS: Record<string, string> = {
+  'ा': 'a', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ृ': 'ri', 'ँ': '~', 'ं': 'm', 'ः': ':'
+};
+
+/**
+ * Returns the exact English Romanized key sequence required to produce a given Nepali/Devanagari word.
+ */
+export function getRomanizedHintForWord(word: string): string {
+  if (!word) return '';
+
+  // Clean word of surrounding punctuation
+  const clean = word.replace(/[।,\.!\?:;"'\(\)\[\]\{\}]/g, '').trim();
+  if (!clean) return word;
+
+  // If already English text, return as-is lowercase
+  if (/^[a-zA-Z0-9]+$/.test(clean)) {
+    return clean.toLowerCase();
+  }
+
+  // Check reverse dictionary first
+  if (REVERSE_DICTIONARY[clean]) {
+    return REVERSE_DICTIONARY[clean];
+  }
+
+  let result = '';
+  let i = 0;
+  const n = clean.length;
+
+  while (i < n) {
+    const char = clean[i];
+
+    // Numbers
+    if (/[०-९]/.test(char)) {
+      const numMap: Record<string, string> = { '०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9' };
+      result += numMap[char] || char;
+      i++;
+      continue;
+    }
+
+    // Check for 2-char conjuncts
+    const twoChar = clean.substring(i, i + 2);
+    let matchedConsonant: string | null = null;
+    let matchedLen = 0;
+
+    if (DEVANAGARI_CONSONANTS[twoChar]) {
+      matchedConsonant = DEVANAGARI_CONSONANTS[twoChar];
+      matchedLen = 2;
+    } else if (DEVANAGARI_CONSONANTS[char]) {
+      matchedConsonant = DEVANAGARI_CONSONANTS[char];
+      matchedLen = 1;
+    }
+
+    if (matchedConsonant) {
+      result += matchedConsonant;
+      i += matchedLen;
+
+      if (i < n) {
+        const nextChar = clean[i];
+        if (nextChar === '्') {
+          // Halant: explicit no vowel following consonant
+          i++;
+        } else if (DEVANAGARI_VOWEL_MATRAS[nextChar]) {
+          result += DEVANAGARI_VOWEL_MATRAS[nextChar];
+          i++;
+        } else {
+          // Inherent 'a' vowel if followed by another consonant or end of word
+          if (i < n && !/[।,\.\s]/.test(nextChar)) {
+            result += 'a';
+          }
+        }
+      }
+      continue;
+    }
+
+    // Independent Vowels
+    if (DEVANAGARI_INDEPENDENT_VOWELS[char]) {
+      result += DEVANAGARI_INDEPENDENT_VOWELS[char];
+      i++;
+      continue;
+    }
+
+    // Matra
+    if (DEVANAGARI_VOWEL_MATRAS[char]) {
+      result += DEVANAGARI_VOWEL_MATRAS[char];
+      i++;
+      continue;
+    }
+
+    result += char;
+    i++;
+  }
+
+  return result.toLowerCase();
+}
+

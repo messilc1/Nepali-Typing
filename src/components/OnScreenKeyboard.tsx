@@ -5,6 +5,8 @@ import { Info, Sparkles, Flame } from 'lucide-react';
 interface OnScreenKeyboardProps {
   keyStatsMap: Record<string, KeyStats>;
   activeKey?: string;
+  nextHintKey?: string;
+  showHints?: boolean;
 }
 
 const KEYBOARD_ROWS = [
@@ -15,7 +17,9 @@ const KEYBOARD_ROWS = [
 
 export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
   keyStatsMap,
-  activeKey
+  activeKey,
+  nextHintKey,
+  showHints = false
 }) => {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [heatmapMode, setHeatmapMode] = useState<'mistakes' | 'speed' | 'frequency'>('mistakes');
@@ -107,13 +111,18 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
           <div key={rowIdx} className="flex items-center justify-center gap-1.5 w-full">
             {row.map(key => {
               const isActive = activeKey?.toLowerCase() === key;
+              const isHintNext = showHints && nextHintKey && nextHintKey.toLowerCase() === key;
               const colorClass = getKeyColorClass(key);
 
               return (
                 <button
                   key={key}
                   onClick={() => setSelectedKey(key)}
-                  className={`w-9 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-sm uppercase transition-all transform hover:scale-105 active:scale-95 shadow-sm ${colorClass} ${
+                  className={`w-9 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-sm uppercase transition-all transform hover:scale-105 active:scale-95 shadow-sm ${
+                    isHintNext
+                      ? 'bg-amber-400 dark:bg-amber-500 text-slate-950 font-black border-amber-500 ring-4 ring-amber-400/80 scale-110 z-20 shadow-lg shadow-amber-500/30 animate-pulse'
+                      : colorClass
+                  } ${
                     isActive ? 'ring-4 ring-blue-500 scale-110 z-10 shadow-lg' : ''
                   }`}
                 >
@@ -131,12 +140,21 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
 
         {/* Spacebar */}
         <div className="flex justify-center w-full mt-1">
-          <button
-            onClick={() => setSelectedKey('space')}
-            className="w-48 sm:w-64 h-10 rounded-xl border bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs font-semibold tracking-widest hover:bg-slate-200 uppercase"
-          >
-            Space
-          </button>
+          {(() => {
+            const isHintSpace = showHints && (nextHintKey === ' ' || nextHintKey?.toLowerCase() === 'space');
+            return (
+              <button
+                onClick={() => setSelectedKey('space')}
+                className={`w-48 sm:w-64 h-10 rounded-xl border text-xs font-semibold tracking-widest uppercase transition-all ${
+                  isHintSpace
+                    ? 'bg-amber-400 dark:bg-amber-500 text-slate-950 font-black border-amber-500 ring-4 ring-amber-400/80 shadow-lg shadow-amber-500/30 animate-pulse'
+                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200'
+                }`}
+              >
+                Space
+              </button>
+            );
+          })()}
         </div>
       </div>
 

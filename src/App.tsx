@@ -40,7 +40,8 @@ const DEFAULT_SETTINGS: TestSettings = {
   showKeyboard: true,
   showMistakes: true,
   showTimer: true,
-  showCursorTrail: true
+  showCursorTrail: true,
+  showHints: false
 };
 
 const INITIAL_USER_STATS: UserStats = {
@@ -87,6 +88,7 @@ export default function App() {
   // Realtime Key Heatmap Metrics State
   const [keyStatsMap, setKeyStatsMap] = useState<Record<string, KeyStats>>({});
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
+  const [nextHintKey, setNextHintKey] = useState<string | undefined>(undefined);
 
   const typingAreaRef = useRef<TypingAreaRef>(null);
 
@@ -294,6 +296,7 @@ export default function App() {
                 onRestartTest={handleRestartTest}
                 onOpenCustomParagraph={() => setShowCustomParagraphModal(true)}
                 onKeypressMetric={handleKeypressMetric}
+                onNextHintKeyChange={setNextHintKey}
               />
             )}
 
@@ -302,6 +305,8 @@ export default function App() {
               <OnScreenKeyboard
                 keyStatsMap={keyStatsMap}
                 activeKey={activeKey}
+                nextHintKey={nextHintKey}
+                showHints={settings.showHints}
               />
             )}
 

@@ -23,6 +23,7 @@ export interface TestSettings {
   showMistakes: boolean;
   showTimer: boolean;
   showCursorTrail: boolean;
+  showHints: boolean;
 }
 
 export interface KeyStats {

@@ -9,10 +9,12 @@ import {
   Sparkles,
   Command,
   Languages,
-  Sliders
+  Sliders,
+  Lightbulb,
+  HelpCircle
 } from 'lucide-react';
 import { TestSettings, TestResult, KeyStats } from '../types';
-import { transliterateWordRuleBased, getWordSuggestions } from '../utils/nepaliTransliteration';
+import { transliterateWordRuleBased, getWordSuggestions, getRomanizedHintForWord } from '../utils/nepaliTransliteration';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 
 interface TypingAreaProps {
@@ -23,6 +25,7 @@ interface TypingAreaProps {
   onRestartTest: () => void;
   onOpenCustomParagraph: () => void;
   onKeypressMetric: (key: string, isCorrect: boolean, latencyMs: number) => void;
+  onNextHintKeyChange?: (key: string | undefined) => void;
 }
 
 export interface TypingAreaRef {
@@ -36,7 +39,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   onTestComplete,
   onRestartTest,
   onOpenCustomParagraph,
-  onKeypressMetric
+  onKeypressMetric,
+  onNextHintKeyChange
 }, ref) => {
   // Input state
   const [typedInput, setTypedInput] = useState<string>(''); // For current word in Romanized mode or full text
@@ -71,6 +75,43 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const targetWords = targetText.trim().split(/\s+/).filter(Boolean);
+
+  // Typing Hint Calculation
+  const currentTargetWord = targetWords[currentWordIndex] || '';
+  const fullHint = getRomanizedHintForWord(currentTargetWord);
+
+  let matchedPrefixLen = 0;
+  let hasMismatch = false;
+
+  const currentBuffer = settings.language === 'nepali' ? romanBuffer : typedInput;
+  const lowerBuf = currentBuffer.toLowerCase();
+  const lowerHint = fullHint.toLowerCase();
+
+  for (let i = 0; i < lowerBuf.length; i++) {
+    if (i < lowerHint.length && lowerBuf[i] === lowerHint[i]) {
+      matchedPrefixLen = i + 1;
+    } else {
+      hasMismatch = true;
+      break;
+    }
+  }
+
+  let nextHintKey: string | undefined = undefined;
+  if (settings.showHints && currentTargetWord && !isTestFinished) {
+    if (matchedPrefixLen < fullHint.length) {
+      nextHintKey = fullHint[matchedPrefixLen];
+    } else if (typedInput === currentTargetWord || (settings.language === 'nepali' && romanBuffer.length >= fullHint.length)) {
+      nextHintKey = ' ';
+    }
+  }
+
+  useEffect(() => {
+    if (settings.showHints) {
+      onNextHintKeyChange?.(nextHintKey);
+    } else {
+      onNextHintKeyChange?.(undefined);
+    }
+  }, [settings.showHints, nextHintKey, onNextHintKeyChange]);
 
   useImperativeHandle(ref, () => ({
     focusInput: () => {
@@ -497,6 +538,20 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
             ))}
           </div>
 
+          {/* Typing Hint Toggle in Sidebar/Header */}
+          <button
+            onClick={() => updateSettings({ showHints: !settings.showHints })}
+            title="Toggle Typing Hint (Romanized key sequence step-by-step)"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              settings.showHints
+                ? 'bg-amber-400 dark:bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-2 ring-amber-400'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            <Lightbulb className={`w-3.5 h-3.5 ${settings.showHints ? 'fill-slate-950' : ''}`} />
+            <span>Hint: {settings.showHints ? 'ON' : 'OFF'}</span>
+          </button>
+
           {/* Restart Button */}
           <button
             onClick={onRestartTest}
@@ -514,7 +569,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       <div
         ref={containerRef}
         onClick={() => inputRef.current?.focus()}
-        className="relative w-full min-h-[220px] max-h-[360px] bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border-2 border-slate-200/80 dark:border-slate-800 shadow-lg hover:border-blue-300 dark:hover:border-blue-800 transition-all cursor-text overflow-hidden select-none flex flex-col justify-between"
+        className="relative w-full min-h-[220px] max-h-[400px] bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border-2 border-slate-200/80 dark:border-slate-800 shadow-lg hover:border-blue-300 dark:hover:border-blue-800 transition-all cursor-text overflow-hidden select-none flex flex-col justify-between"
       >
         {/* Hidden Input field capturing keystrokes */}
         <input
@@ -526,6 +581,67 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           className="absolute opacity-0 pointer-events-none w-0 h-0"
           autoFocus
         />
+
+        {/* Romanized Hint Mode Banner (Unobtrusive floating hint bar) */}
+        {settings.showHints && currentTargetWord && !isTestFinished && (
+          <div className="mb-4 w-full bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 dark:from-amber-950/70 dark:via-amber-900/40 dark:to-amber-950/30 border-2 border-amber-300/80 dark:border-amber-700/80 p-3 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+            
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Hint Badge */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-xs">
+                <Lightbulb className="w-3.5 h-3.5 fill-slate-950" />
+                <span>Romanized Hint</span>
+              </div>
+
+              {/* Target Word */}
+              <div className="flex items-center gap-2">
+                <span className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100" style={getFontFamilyStyle()}>
+                  {currentTargetWord}
+                </span>
+                <span className="text-amber-500 font-bold">→</span>
+              </div>
+
+              {/* Step-by-Step Character Highlights */}
+              <div className="flex items-center gap-1 bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800 shadow-inner font-mono text-sm sm:text-base">
+                {fullHint.split('').map((char, charIdx) => {
+                  const isTypedCorrect = charIdx < matchedPrefixLen;
+                  const isNextRequired = charIdx === matchedPrefixLen;
+
+                  let charStyle = 'text-slate-400 dark:text-slate-500';
+                  if (isTypedCorrect) {
+                    charStyle = 'text-emerald-600 dark:text-emerald-400 font-black';
+                  } else if (isNextRequired) {
+                    charStyle = 'bg-amber-400 dark:bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse';
+                  }
+
+                  return (
+                    <span key={charIdx} className={`transition-all ${charStyle}`}>
+                      {char}
+                    </span>
+                  );
+                })}
+
+                {/* Prompt Spacebar when word is finished */}
+                {(matchedPrefixLen >= fullHint.length || typedInput === currentTargetWord) && (
+                  <span className="ml-2 bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black px-2 py-0.5 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse uppercase tracking-wider">
+                    Space ↵
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Mismatch indicator when wrong key pressed */}
+            {hasMismatch && (
+              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-100/90 dark:bg-rose-950/80 px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800">
+                <span>Wrong key! Next required key:</span>
+                <kbd className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded shadow-sm uppercase">
+                  {nextHintKey === ' ' ? 'Space' : nextHintKey}
+                </kbd>
+              </div>
+            )}
+
+          </div>
+        )}
 
         {/* Romanized Live Buffer Indicator (Floating Preview) */}
         {settings.language === 'nepali' && romanBuffer && (

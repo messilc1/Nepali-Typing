@@ -129,6 +129,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </label>
 
           {[
+            { key: 'showHints', label: 'Show Typing Hints (Romanized Key Sequence)' },
             { key: 'showLiveWpm', label: 'Show Live WPM Counter' },
             { key: 'showLiveAccuracy', label: 'Show Live Accuracy %' },
             { key: 'showKeyboard', label: 'Show On-Screen Keyboard Heatmap' },
