@@ -118,7 +118,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
                 <button
                   key={key}
                   onClick={() => setSelectedKey(key)}
-                  className={`w-9 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-sm uppercase transition-all transform hover:scale-105 active:scale-95 shadow-sm ${
+                  className={`w-9 h-11 sm:w-12 sm:h-12 rounded-xl border flex flex-col items-center justify-center text-sm uppercase transition-all transform hover:scale-105 active:scale-95 shadow-sm relative ${
                     isHintNext
                       ? 'bg-amber-400 dark:bg-amber-500 text-slate-950 font-black border-amber-500 ring-4 ring-amber-400/80 scale-110 z-20 shadow-lg shadow-amber-500/30 animate-pulse'
                       : colorClass
@@ -127,6 +127,11 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
                   }`}
                 >
                   <span className="font-bold">{key}</span>
+                  {isHintNext && nextHintKey && nextHintKey === nextHintKey.toUpperCase() && nextHintKey !== nextHintKey.toLowerCase() && (
+                    <span className="text-[8px] font-black text-slate-950 leading-none bg-amber-200/90 px-1 rounded mt-0.5">
+                      ⇧ SHIFT
+                    </span>
+                  )}
                   {keyStatsMap[key]?.mistakes ? (
                     <span className="text-[9px] text-rose-600 dark:text-rose-400 font-mono leading-none">
                       {keyStatsMap[key].mistakes}x

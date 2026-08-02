@@ -81,7 +81,8 @@ export const CustomParagraphModal: React.FC<CustomParagraphModalProps> = ({
             onChange={(e) => setPastedText(e.target.value)}
             placeholder="Paste your custom paragraph here in Nepali or English..."
             rows={8}
-            className="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-['Mukta']"
+            className="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 nepali-font-apply"
+            style={{ fontFamily: 'var(--app-nepali-font)' }}
           ></textarea>
         </div>
 

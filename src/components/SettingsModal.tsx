@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Volume2, Type, Eye, Palette, Check } from 'lucide-react';
 import { TestSettings } from '../types';
+import { FontSelector } from './FontSelector';
 
 interface SettingsModalProps {
   settings: TestSettings;
@@ -30,27 +31,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Font Family */}
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
-            <Type className="w-4 h-4 text-blue-600" /> Font Family
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {(['Mukta', 'Noto Sans Devanagari', 'Plus Jakarta Sans'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => updateSettings({ fontFamily: f })}
-                className={`p-3 rounded-xl border text-xs font-bold transition-all text-center ${
-                  settings.fontFamily === f
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Font Family Selector */}
+        <FontSelector
+          currentFont={settings.fontFamily}
+          onSelectFont={(fontId) => updateSettings({ fontFamily: fontId })}
+          variant="settings"
+        />
 
         {/* Font Size */}
         <div>

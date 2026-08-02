@@ -1,1 +1,49 @@
 @import "tailwindcss";
+
+/* Google Devanagari Web Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@300;400;500;600;700;800;900&family=Noto+Serif+Devanagari:wght@400;600;700;900&family=Tiro+Devanagari+Hindi:ital@0;1&family=Rozha+One&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+
+/* Registered Custom Local / Devanagari Font Faces with Web Fallbacks */
+@font-face {
+  font-family: 'Kalimati';
+  src: url('/fonts/Kalimati-Regular.otf') format('opentype'),
+       url('https://cdn.jsdelivr.net/gh/subhash-lc/nepali-fonts@main/Kalimati-Regular.otf') format('opentype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Kokila';
+  src: local('Kokila'), url('https://cdn.jsdelivr.net/gh/subhash-lc/nepali-fonts@main/Kokila.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Mangal';
+  src: local('Mangal'), url('https://cdn.jsdelivr.net/gh/subhash-lc/nepali-fonts@main/Mangal.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aparajita';
+  src: local('Aparajita'), url('https://cdn.jsdelivr.net/gh/subhash-lc/nepali-fonts@main/Aparajita.ttf') format('truetype');
+  font-display: swap;
+}
+
+/* CSS Global Font Architecture */
+:root {
+  --app-nepali-font: 'Noto Sans Devanagari', 'Mukta', 'Kalimati', sans-serif;
+}
+
+.nepali-font-apply {
+  font-family: var(--app-nepali-font) !important;
+}
+
+/* Custom Animations & Glow Effects */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}

@@ -135,7 +135,10 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
         </div>
 
         {/* Current Big Devanagari Character */}
-        <div className="text-6xl sm:text-8xl font-black text-slate-900 dark:text-slate-100 my-6 tracking-wide drop-shadow-sm font-['Mukta']">
+        <div
+          className="text-6xl sm:text-8xl font-black text-slate-900 dark:text-slate-100 my-6 tracking-wide drop-shadow-sm nepali-font-apply"
+          style={{ fontFamily: 'var(--app-nepali-font)' }}
+        >
           {currentItem}
         </div>
 
@@ -148,7 +151,8 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
             onChange={() => {}}
             placeholder="Type here..."
             autoFocus
-            className="w-full px-6 py-4 text-center text-2xl font-bold rounded-2xl border-2 border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-500/30 shadow-inner"
+            className="w-full px-6 py-4 text-center text-2xl font-bold rounded-2xl border-2 border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-500/30 shadow-inner nepali-font-apply"
+            style={{ fontFamily: 'var(--app-nepali-font)' }}
           />
 
           {romanBuffer && (

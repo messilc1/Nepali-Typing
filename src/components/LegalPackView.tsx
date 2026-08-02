@@ -102,7 +102,10 @@ export const LegalPackView: React.FC<LegalPackViewProps> = ({
             <div key={i} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-['Mukta']">
+                  <span
+                    className="text-2xl font-black text-slate-900 dark:text-slate-100 nepali-font-apply"
+                    style={{ fontFamily: 'var(--app-nepali-font)' }}
+                  >
                     {term.devanagari}
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">

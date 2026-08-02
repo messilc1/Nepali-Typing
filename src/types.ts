@@ -13,7 +13,7 @@ export interface TestSettings {
   difficulty: DifficultyLevel;
   legalCategory?: string;
   fontSize: 'sm' | 'md' | 'lg' | 'xl';
-  fontFamily: 'Mukta' | 'Noto Sans Devanagari' | 'Plus Jakarta Sans';
+  fontFamily: 'Kalimati' | 'Noto Sans Devanagari' | 'Noto Serif Devanagari' | 'Mukta' | 'Kokila' | 'Mangal' | 'Aparajita' | 'Tiro Devanagari' | 'Plus Jakarta Sans' | string;
   theme: 'white-blue' | 'dark' | 'high-contrast-blue';
   sound: 'none' | 'click' | 'mechanical' | 'typewriter';
   soundVolume: number;

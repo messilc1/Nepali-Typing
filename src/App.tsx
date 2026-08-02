@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { LiveStatsBar } from './components/LiveStatsBar';
 import { TypingArea, TypingAreaRef } from './components/TypingArea';
@@ -12,6 +12,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
 
 import { TestSettings, TestResult, UserStats, KeyStats } from './types';
+import { applyGlobalNepaliFont, getStoredNepaliFont } from './utils/fonts';
 import {
   NEPALI_WORDS_EASY,
   NEPALI_WORDS_MEDIUM,
@@ -31,7 +32,7 @@ const DEFAULT_SETTINGS: TestSettings = {
   customText: '',
   difficulty: 'medium',
   fontSize: 'md',
-  fontFamily: 'Mukta',
+  fontFamily: getStoredNepaliFont(),
   theme: 'white-blue',
   sound: 'click',
   soundVolume: 0.5,
@@ -96,6 +97,13 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('nepali_typing_settings', JSON.stringify(settings));
   }, [settings]);
+
+  // Synchronize Global Devanagari Font
+  useEffect(() => {
+    if (settings.fontFamily) {
+      applyGlobalNepaliFont(settings.fontFamily);
+    }
+  }, [settings.fontFamily]);
 
   // Persist User Stats
   useEffect(() => {
@@ -239,6 +247,10 @@ export default function App() {
     }
   };
 
+  const handleNextHintKeyChange = useCallback((key: string | undefined) => {
+    setNextHintKey(prev => (prev === key ? prev : key));
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors">
       
@@ -296,7 +308,7 @@ export default function App() {
                 onRestartTest={handleRestartTest}
                 onOpenCustomParagraph={() => setShowCustomParagraphModal(true)}
                 onKeypressMetric={handleKeypressMetric}
-                onNextHintKeyChange={setNextHintKey}
+                onNextHintKeyChange={handleNextHintKeyChange}
               />
             )}
 

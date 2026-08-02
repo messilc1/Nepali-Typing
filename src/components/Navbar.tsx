@@ -15,6 +15,7 @@ import {
   Minimize
 } from 'lucide-react';
 import { LanguageMode, TestSettings, UserStats } from '../types';
+import { FontSelector } from './FontSelector';
 
 interface NavbarProps {
   activeTab: 'test' | 'practice' | 'legal' | 'heatmap' | 'history';
@@ -153,6 +154,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Flame className="w-4 h-4 text-amber-500 fill-amber-500 animate-pulse" />
               <span>{userStats.currentStreakDays}d Streak</span>
             </div>
+
+            {/* Font Selector Dropdown */}
+            <FontSelector
+              currentFont={settings.fontFamily}
+              onSelectFont={(fontId) => updateSettings({ fontFamily: fontId })}
+              variant="navbar"
+            />
 
             {/* Language Switcher Pill */}
             <button

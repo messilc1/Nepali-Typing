@@ -271,7 +271,12 @@ https://nepalitypingpro.app
             <div className="space-y-2">
               {mistypedWords.map(([word, count], i) => (
                 <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-sm">
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{word}</span>
+                  <span
+                    className="font-semibold text-slate-800 dark:text-slate-200 nepali-font-apply"
+                    style={{ fontFamily: 'var(--app-nepali-font)' }}
+                  >
+                    {word}
+                  </span>
                   <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950 px-2 py-0.5 rounded-md">
                     {count} mistakes
                   </span>

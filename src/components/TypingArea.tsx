@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from 'react';
 import {
   RotateCcw,
   Clock,
@@ -16,6 +16,7 @@ import {
 import { TestSettings, TestResult, KeyStats } from '../types';
 import { transliterateWordRuleBased, getWordSuggestions, getRomanizedHintForWord } from '../utils/nepaliTransliteration';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
+import { getFontCssValue } from '../utils/fonts';
 
 interface TypingAreaProps {
   settings: TestSettings;
@@ -76,42 +77,73 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
   const targetWords = targetText.trim().split(/\s+/).filter(Boolean);
 
-  // Typing Hint Calculation
+  // Typing Hint Calculation - Fully Dynamic Real-Time Engine
   const currentTargetWord = targetWords[currentWordIndex] || '';
-  const fullHint = getRomanizedHintForWord(currentTargetWord);
 
-  let matchedPrefixLen = 0;
-  let hasMismatch = false;
+  const fullHint = useMemo(() => {
+    if (!currentTargetWord) return '';
+    if (settings.language === 'english') {
+      return currentTargetWord.replace(/[.,!?:;"'()\[\]{}]/g, '').toLowerCase();
+    }
+    return getRomanizedHintForWord(currentTargetWord);
+  }, [currentTargetWord, settings.language]);
 
   const currentBuffer = settings.language === 'nepali' ? romanBuffer : typedInput;
-  const lowerBuf = currentBuffer.toLowerCase();
-  const lowerHint = fullHint.toLowerCase();
 
-  for (let i = 0; i < lowerBuf.length; i++) {
-    if (i < lowerHint.length && lowerBuf[i] === lowerHint[i]) {
-      matchedPrefixLen = i + 1;
-    } else {
-      hasMismatch = true;
-      break;
+  const { matchedPrefixLen, hasMismatch, mismatchedChar, expectedChar } = useMemo(() => {
+    const lowerBuf = currentBuffer.toLowerCase();
+    const lowerHint = fullHint.toLowerCase();
+
+    let prefixLen = 0;
+    let mismatch = false;
+    let badChar = '';
+    let expChar = '';
+
+    for (let i = 0; i < lowerBuf.length; i++) {
+      if (i < lowerHint.length && lowerBuf[i] === lowerHint[i]) {
+        prefixLen = i + 1;
+      } else {
+        mismatch = true;
+        badChar = currentBuffer[i] || '';
+        expChar = fullHint[i] || '';
+        break;
+      }
     }
-  }
 
-  let nextHintKey: string | undefined = undefined;
-  if (settings.showHints && currentTargetWord && !isTestFinished) {
+    return {
+      matchedPrefixLen: prefixLen,
+      hasMismatch: mismatch,
+      mismatchedChar: badChar,
+      expectedChar: expChar
+    };
+  }, [currentBuffer, fullHint]);
+
+  const isWordFullyTyped =
+    (fullHint.length > 0 && matchedPrefixLen >= fullHint.length) ||
+    typedInput === currentTargetWord;
+
+  const nextHintKey = useMemo(() => {
+    if (!settings.showHints || isTestFinished || !currentTargetWord) return undefined;
+    if (isWordFullyTyped) return ' '; // Prompt spacebar
     if (matchedPrefixLen < fullHint.length) {
-      nextHintKey = fullHint[matchedPrefixLen];
-    } else if (typedInput === currentTargetWord || (settings.language === 'nepali' && romanBuffer.length >= fullHint.length)) {
-      nextHintKey = ' ';
+      return fullHint[matchedPrefixLen];
     }
-  }
+    return undefined;
+  }, [settings.showHints, isTestFinished, currentTargetWord, isWordFullyTyped, matchedPrefixLen, fullHint]);
+
+  const completedPart = useMemo(() => fullHint.substring(0, matchedPrefixLen), [fullHint, matchedPrefixLen]);
+  const remainingPart = useMemo(() => {
+    const startIdx = matchedPrefixLen + (nextHintKey && nextHintKey !== ' ' ? 1 : 0);
+    return fullHint.substring(startIdx);
+  }, [fullHint, matchedPrefixLen, nextHintKey]);
 
   useEffect(() => {
-    if (settings.showHints) {
+    if (settings.showHints && !isTestFinished && currentTargetWord) {
       onNextHintKeyChange?.(nextHintKey);
     } else {
       onNextHintKeyChange?.(undefined);
     }
-  }, [settings.showHints, nextHintKey, onNextHintKeyChange]);
+  }, [settings.showHints, isTestFinished, currentTargetWord, nextHintKey, onNextHintKeyChange]);
 
   useImperativeHandle(ref, () => ({
     focusInput: () => {
@@ -409,7 +441,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
   // Compute font family style
   const getFontFamilyStyle = () => {
-    return { fontFamily: `'${settings.fontFamily}', 'Mukta', 'Noto Sans Devanagari', sans-serif` };
+    return { fontFamily: getFontCssValue(settings.fontFamily) };
   };
 
   return (
@@ -582,64 +614,91 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           autoFocus
         />
 
-        {/* Romanized Hint Mode Banner (Unobtrusive floating hint bar) */}
+        {/* Romanized Live Hint Panel */}
         {settings.showHints && currentTargetWord && !isTestFinished && (
-          <div className="mb-4 w-full bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 dark:from-amber-950/70 dark:via-amber-900/40 dark:to-amber-950/30 border-2 border-amber-300/80 dark:border-amber-700/80 p-3 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+          <div className="mb-4 w-full bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-slate-900/10 dark:from-amber-950/80 dark:via-slate-900/90 dark:to-slate-950/90 border-2 border-amber-400/80 dark:border-amber-500/80 p-3 sm:p-4 rounded-2xl shadow-lg flex flex-col gap-3 animate-fadeIn">
             
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Hint Badge */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-xs">
-                <Lightbulb className="w-3.5 h-3.5 fill-slate-950" />
-                <span>Romanized Hint</span>
-              </div>
-
-              {/* Target Word */}
+            {/* Top Bar: Title & Progress */}
+            <div className="flex items-center justify-between gap-2 border-b border-amber-200/50 dark:border-slate-800 pb-2">
               <div className="flex items-center gap-2">
-                <span className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100" style={getFontFamilyStyle()}>
-                  {currentTargetWord}
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-sm">
+                  <Lightbulb className="w-3.5 h-3.5 fill-slate-950" />
+                  <span>Live Hint Engine</span>
+                </div>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                  Word {currentWordIndex + 1} of {targetWords.length}
                 </span>
-                <span className="text-amber-500 font-bold">→</span>
               </div>
 
-              {/* Step-by-Step Character Highlights */}
-              <div className="flex items-center gap-1 bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800 shadow-inner font-mono text-sm sm:text-base">
-                {fullHint.split('').map((char, charIdx) => {
-                  const isTypedCorrect = charIdx < matchedPrefixLen;
-                  const isNextRequired = charIdx === matchedPrefixLen;
-
-                  let charStyle = 'text-slate-400 dark:text-slate-500';
-                  if (isTypedCorrect) {
-                    charStyle = 'text-emerald-600 dark:text-emerald-400 font-black';
-                  } else if (isNextRequired) {
-                    charStyle = 'bg-amber-400 dark:bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse';
-                  }
-
-                  return (
-                    <span key={charIdx} className={`transition-all ${charStyle}`}>
-                      {char}
-                    </span>
-                  );
-                })}
-
-                {/* Prompt Spacebar when word is finished */}
-                {(matchedPrefixLen >= fullHint.length || typedInput === currentTargetWord) && (
-                  <span className="ml-2 bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black px-2 py-0.5 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse uppercase tracking-wider">
-                    Space ↵
-                  </span>
-                )}
-              </div>
+              {hasMismatch && (
+                <div className="flex items-center gap-2 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/90 px-3 py-1 rounded-xl border border-rose-300 dark:border-rose-800 shadow-xs animate-bounce">
+                  <span>Wrong key: <strong className="font-mono text-rose-950 dark:text-rose-100 uppercase">{mismatchedChar || '?'}</strong></span>
+                  <span className="text-slate-400 dark:text-slate-600">|</span>
+                  <span>Required:</span>
+                  <kbd className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase shadow-xs">
+                    {nextHintKey === ' ' ? 'Space' : nextHintKey}
+                  </kbd>
+                </div>
+              )}
             </div>
 
-            {/* Mismatch indicator when wrong key pressed */}
-            {hasMismatch && (
-              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-100/90 dark:bg-rose-950/80 px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800">
-                <span>Wrong key! Next required key:</span>
-                <kbd className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded shadow-sm uppercase">
-                  {nextHintKey === ' ' ? 'Space' : nextHintKey}
-                </kbd>
-              </div>
-            )}
+            {/* Main Guidance Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Target Word & Key Sequence */}
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Devanagari Word */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Current Word</span>
+                  <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-300" style={getFontFamilyStyle()}>
+                    {currentTargetWord}
+                  </span>
+                </div>
 
+                <span className="text-amber-400 font-bold hidden sm:inline">→</span>
+
+                {/* Character Key Sequence Breakdown */}
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Romanized Sequence</span>
+                  <div className="flex items-center gap-0.5 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-slate-800 shadow-inner font-mono text-base sm:text-lg">
+                    {/* Completed Part */}
+                    {completedPart && (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                        {completedPart}
+                      </span>
+                    )}
+
+                    {/* Next Key */}
+                    {!isWordFullyTyped && nextHintKey && nextHintKey !== ' ' && (
+                      <span className="bg-amber-400 dark:bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse uppercase mx-0.5">
+                        {nextHintKey}
+                      </span>
+                    )}
+
+                    {/* Remaining Part */}
+                    {remainingPart && (
+                      <span className="text-slate-400 dark:text-slate-500 font-medium">
+                        {remainingPart}
+                      </span>
+                    )}
+
+                    {/* Spacebar Prompt */}
+                    {isWordFullyTyped && (
+                      <span className="bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse uppercase tracking-wider flex items-center gap-1">
+                        Press Space ↵
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Prominent Next Key Badge */}
+              <div className="flex flex-col items-center justify-center bg-white dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-600/80 px-4 py-1.5 rounded-2xl min-w-[90px] shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Next Key</span>
+                <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 animate-pulse uppercase">
+                  {nextHintKey === ' ' ? 'SPACE ␣' : (nextHintKey || '—')}
+                </span>
+              </div>
+            </div>
           </div>
         )}
 
