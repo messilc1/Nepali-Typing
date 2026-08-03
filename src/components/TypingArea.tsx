@@ -13,7 +13,7 @@ import {
   Lightbulb,
   HelpCircle
 } from 'lucide-react';
-import { TestSettings, TestResult, KeyStats, LiveStats } from '../types';
+import { TestSettings, TestResult, KeyStats, LiveStats, SessionStatus } from '../types';
 import { transliterateWordRuleBased, getWordSuggestions, getRomanizedHintForWord } from '../utils/nepaliTransliteration';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
@@ -29,6 +29,7 @@ interface TypingAreaProps {
   onKeypressMetric: (key: string, isCorrect: boolean, latencyMs: number) => void;
   onNextHintKeyChange?: (key: string | undefined) => void;
   onLiveStatsChange?: (stats: LiveStats) => void;
+  onLiveSessionUpdate?: (session: TestResult) => void;
 }
 
 export interface TypingAreaRef {
@@ -45,7 +46,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   onOpenCustomParagraph,
   onKeypressMetric,
   onNextHintKeyChange,
-  onLiveStatsChange
+  onLiveStatsChange,
+  onLiveSessionUpdate
 }, ref) => {
   // Input state
   const [typedInput, setTypedInput] = useState<string>(''); // For current word in Romanized mode or full text
@@ -258,7 +260,69 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     inputRef.current?.focus();
   }, [targetText, settings.language]);
 
+  // Ref for active session tracking
+  const sessionIdRef = useRef<string | null>(null);
+
+  // Helper to construct real-time session record
+  const emitLiveSession = useCallback((status: SessionStatus = 'Abandoned') => {
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = 'session_' + Date.now();
+    }
+
+    const liveStats = computeLiveStats();
+    const historyLen = typedHistoryRef.current.length;
+    const progressPercent = targetWords.length > 0 ? Math.min(100, Math.round((historyLen / targetWords.length) * 100)) : 0;
+
+    const liveResult: TestResult = {
+      id: sessionIdRef.current,
+      timestamp: startTimeRef.current || Date.now(),
+      lastActivityTimestamp: Date.now(),
+      language: settings.language,
+      testType: settings.testType,
+      sessionStatus: status,
+      progressPercent,
+      durationSeconds: settings.durationSeconds,
+      elapsedSeconds: liveStats.elapsedSeconds,
+      remainingSeconds: liveStats.remainingSeconds,
+      grossWpm: liveStats.grossWpm,
+      netWpm: liveStats.netWpm,
+      accuracy: liveStats.accuracy,
+      totalCharactersTyped: liveStats.totalCharactersTyped,
+      correctCharacters: liveStats.correctCharacters,
+      wrongCharacters: liveStats.wrongCharacters,
+      totalWordsTyped: liveStats.completedWordsCount,
+      correctWords: liveStats.correctWords,
+      wrongWords: liveStats.wrongWords,
+      mistakesCount: liveStats.mistakesCount,
+      backspacesCount: liveStats.backspacesCount,
+      consistencyPercent: liveStats.consistency,
+      performanceGrade: liveStats.netWpm >= 50 && liveStats.accuracy >= 95 ? 'Excellent' : liveStats.netWpm >= 30 && liveStats.accuracy >= 90 ? 'Good' : liveStats.netWpm >= 15 && liveStats.accuracy >= 80 ? 'Average' : 'Needs Improvement',
+      wpmOverTime: wpmSamplesRef.current.length > 0 ? wpmSamplesRef.current : [{ second: liveStats.elapsedSeconds, wpm: liveStats.netWpm, rawWpm: liveStats.grossWpm, errors: liveStats.mistakesCount }],
+      keyStatsMap: keyStatsRef.current,
+      mistypedWordsMap: mistypedWordsRef.current,
+      mistypedCharsMap: mistypedCharsRef.current,
+      slowWordsMap: {},
+      sampleText: targetText.substring(0, 100) + '...',
+      categoryOrTitle: passageTitle || (
+        settings.testType === 'legal'
+          ? (settings.legalCategory || 'Lok Sewa Legal Pack')
+          : settings.testType === 'custom'
+          ? 'Custom Paragraph'
+          : settings.testType === 'quote'
+          ? 'Quote Test'
+          : settings.testType === 'paragraph'
+          ? 'Paragraph Test'
+          : settings.testType === 'words'
+          ? `${settings.wordCount} Words Test`
+          : `${settings.durationSeconds}s Speed Test`
+      )
+    };
+
+    onLiveSessionUpdate?.(liveResult);
+  }, [computeLiveStats, targetWords, settings, targetText, passageTitle, onLiveSessionUpdate]);
+
   const resetState = useCallback(() => {
+    sessionIdRef.current = null;
     setTypedInput('');
     setTypedHistory([]);
     setCurrentWordIndex(0);
@@ -380,13 +444,20 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       consistency = Math.max(50, Math.min(100, Math.round(100 - (stdDev / (mean || 1)) * 50)));
     }
 
+    const isTimedOut = settings.testType === 'time' && (finalElapsedSec || elapsedSeconds) >= settings.durationSeconds;
+    const sessionStatus: SessionStatus = isTimedOut ? 'Timed Out' : 'Completed';
+
     const resultObj: TestResult = {
-      id: 'test_' + Date.now(),
-      timestamp: Date.now(),
+      id: sessionIdRef.current || ('test_' + Date.now()),
+      timestamp: startTimeRef.current || Date.now(),
+      lastActivityTimestamp: Date.now(),
       language: settings.language,
       testType: settings.testType,
+      sessionStatus,
+      progressPercent: 100,
       durationSeconds: settings.durationSeconds,
       elapsedSeconds: timeSpent,
+      remainingSeconds: 0,
       grossWpm,
       netWpm,
       accuracy,
@@ -422,7 +493,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     };
 
     onTestComplete(resultObj);
-  }, [targetText, targetWords, settings, passageTitle, onTestComplete]);
+  }, [targetText, targetWords, settings, passageTitle, elapsedSeconds, onTestComplete]);
 
   // Clean, responsive Timer logic (Independent of keystroke updates)
   useEffect(() => {
@@ -435,6 +506,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         const live = computeLiveStats(seconds);
         onLiveStatsChange?.(live);
+
+        // Emit live session record continuously for Analytics
+        emitLiveSession('Abandoned');
 
         // Record WPM sample for graph every second
         const lastSampleSecond = wpmSamplesRef.current.length > 0 ? wpmSamplesRef.current[wpmSamplesRef.current.length - 1].second : -1;
@@ -458,20 +532,11 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isTestRunning, isTestFinished, startTime, settings.testType, settings.durationSeconds, computeLiveStats, finishTest, onLiveStatsChange]);
+  }, [isTestRunning, isTestFinished, startTime, settings.testType, settings.durationSeconds, computeLiveStats, finishTest, onLiveStatsChange, emitLiveSession]);
 
   // Handle Keystrokes & Romanized Conversion
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isTestFinishedRef.current) return;
-
-    // Shortcuts
-    if (e.ctrlKey && e.code === 'Space') {
-      e.preventDefault();
-      updateSettings({
-        language: settings.language === 'nepali' ? 'english' : 'nepali'
-      });
-      return;
-    }
 
     if (e.ctrlKey && e.key === 'Enter') {
       e.preventDefault();
@@ -485,13 +550,17 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       return;
     }
 
-    // Start timer on FIRST valid keystroke
+    // Start timer & session on FIRST valid keystroke
     if (!isTestRunningRef.current) {
       const now = Date.now();
       isTestRunningRef.current = true;
       setIsTestRunning(true);
       startTimeRef.current = now;
       setStartTime(now);
+      if (!sessionIdRef.current) {
+        sessionIdRef.current = 'session_' + now;
+      }
+      emitLiveSession('Abandoned');
     }
 
     // Sound feedback
@@ -601,6 +670,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       setActiveSuggestions([]);
 
       onLiveStatsChange?.(computeLiveStats());
+      emitLiveSession('Abandoned');
 
       // Check for Word count completion or end of passage
       if (
@@ -617,20 +687,46 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       setKeystrokes(prev => prev + 1);
       playKeypressSound(settings.sound, settings.soundVolume);
 
+      let currentConvertedOrTyped = '';
       if (settings.language === 'nepali') {
         const newBuf = romanBuffer + e.key;
         setRomanBuffer(newBuf);
         const converted = transliterateWordRuleBased(newBuf);
         setTypedInput(converted);
         typedInputRef.current = converted;
+        currentConvertedOrTyped = converted;
         setActiveSuggestions(getWordSuggestions(newBuf));
       } else {
         const newTyped = typedInput + e.key;
         setTypedInput(newTyped);
         typedInputRef.current = newTyped;
+        currentConvertedOrTyped = newTyped;
       }
 
       onLiveStatsChange?.(computeLiveStats());
+      emitLiveSession('Abandoned');
+
+      // Check auto-completion on last character of last word for untimed/paragraph tests
+      const currentTargetWord = targetWords[currentWordIndex] || '';
+      const isLastWord = currentWordIndex === targetWords.length - 1;
+
+      if (isLastWord && currentTargetWord && (currentConvertedOrTyped === currentTargetWord || currentConvertedOrTyped.length >= currentTargetWord.length)) {
+        // Commit final word immediately
+        const nextHistory = [...typedHistory, currentConvertedOrTyped];
+        typedHistoryRef.current = nextHistory;
+        setTypedHistory(nextHistory);
+
+        const nextWordIdx = currentWordIndex + 1;
+        currentWordIndexRef.current = nextWordIdx;
+        setCurrentWordIndex(nextWordIdx);
+
+        setTypedInput('');
+        typedInputRef.current = '';
+        setRomanBuffer('');
+
+        finishTest();
+        return;
+      }
     }
   };
 
@@ -945,7 +1041,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         {/* Text View Container */}
         <div
-          className={`w-full flex flex-wrap gap-x-3 gap-y-2 text-slate-400 dark:text-slate-500 font-normal transition-all ${getFontSizeClass()}`}
+          className={`w-full flex flex-wrap gap-x-3 gap-y-2 text-slate-400 dark:text-slate-500 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 py-4 scroll-smooth ${getFontSizeClass()}`}
           style={getFontFamilyStyle()}
         >
           {targetWords.map((word, wordIdx) => {
@@ -1009,10 +1105,6 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         {/* Bottom Helper Bar */}
         <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 font-mono">
-              <Command className="w-3.5 h-3.5 text-blue-500" />
-              <kbd className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">Ctrl + Space</kbd> Switch Language
-            </span>
             <span className="flex items-center gap-1 font-mono">
               <kbd className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">Ctrl + Enter</kbd> Restart
             </span>

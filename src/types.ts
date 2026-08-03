@@ -105,13 +105,19 @@ export interface KeyStats {
   totalTimeMs: number;
 }
 
+export type SessionStatus = 'Completed' | 'Timed Out' | 'Abandoned' | 'Interrupted';
+
 export interface TestResult {
   id: string;
   timestamp: number;
+  lastActivityTimestamp?: number;
   language: LanguageMode;
   testType: TestType;
+  sessionStatus?: SessionStatus;
+  progressPercent?: number;
   durationSeconds: number;
   elapsedSeconds: number;
+  remainingSeconds?: number | null;
   grossWpm: number;
   netWpm: number;
   accuracy: number; // 0 - 100

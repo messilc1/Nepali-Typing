@@ -115,16 +115,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="btn-language-toggle"
               onClick={toggleLanguage}
-              title="Press Ctrl + Space to toggle language"
+              title="Toggle language (Nepali / English)"
               className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-bold transition-all shadow-sm whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Globe className="w-3.5 h-3.5 text-blue-600" />
               <span className="text-xs">
                 {settings.language === 'nepali' ? '🇳🇵 Nepali' : '🇬🇧 English'}
               </span>
-              <kbd className="hidden xl:inline-block text-[10px] bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-700 font-mono text-slate-500">
-                Ctrl+Space
-              </kbd>
             </button>
 
             {/* Sound Toggle */}

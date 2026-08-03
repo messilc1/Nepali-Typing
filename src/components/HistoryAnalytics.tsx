@@ -23,7 +23,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { UserStats, KeyStats, TestResult } from '../types';
+import { UserStats, KeyStats, TestResult, SessionStatus } from '../types';
 import { OnScreenKeyboard } from './OnScreenKeyboard';
 import { ErrorAnalysisView } from './ErrorAnalysisView';
 
@@ -49,6 +49,7 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
   const [filterDateRange, setFilterDateRange] = useState<string>('all');
   const [filterLanguage, setFilterLanguage] = useState<string>('all');
   const [filterDuration, setFilterDuration] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const history = userStats.history || [];
@@ -231,6 +232,12 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
       if (filterDuration === 'medium' && (item.elapsedSeconds <= 30 || item.elapsedSeconds > 60)) return false;
       if (filterDuration === 'long' && item.elapsedSeconds <= 60) return false;
 
+      // Session Status Filter
+      if (filterStatus !== 'all') {
+        const itemStatus = item.sessionStatus || 'Completed';
+        if (itemStatus !== filterStatus) return false;
+      }
+
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -245,7 +252,7 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
 
       return true;
     });
-  }, [history, filterTestType, filterLanguage, filterDateRange, filterDuration, searchQuery]);
+  }, [history, filterTestType, filterLanguage, filterDateRange, filterDuration, filterStatus, searchQuery]);
 
   // ==========================================
   // CSV EXPORT FUNCTION
@@ -790,7 +797,7 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
             </div>
 
             {/* Filter Options Group */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs font-semibold">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 text-xs font-semibold">
               
               {/* Test Type Filter */}
               <div>
@@ -806,6 +813,22 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
                   <option value="legal">Legal Pack / Lok Sewa</option>
                   <option value="custom">Custom Paragraph</option>
                   <option value="quote">Quote Test</option>
+                </select>
+              </div>
+
+              {/* Session Status Filter */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Status:</label>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold focus:outline-none"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Timed Out">Timed Out</option>
+                  <option value="Abandoned">Abandoned</option>
+                  <option value="Interrupted">Interrupted</option>
                 </select>
               </div>
 
@@ -863,6 +886,7 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
                 <tr>
                   <th className="px-4 py-3">Date & Time</th>
                   <th className="px-4 py-3">Type / Passage</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Lang</th>
                   <th className="px-4 py-3">Net WPM</th>
                   <th className="px-4 py-3">Gross</th>
@@ -890,6 +914,17 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
                       <div className="text-[10px] text-slate-400 truncate max-w-[14rem]">
                         {item.sampleText}
                       </div>
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      {item.sessionStatus === 'Completed' || !item.sessionStatus ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">Completed</span>
+                      ) : item.sessionStatus === 'Timed Out' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800">Timed Out</span>
+                      ) : item.sessionStatus === 'Abandoned' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">Abandoned</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800">Interrupted</span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 uppercase font-bold text-blue-600 dark:text-blue-400">
                       {item.language === 'nepali' ? '🇳🇵' : '🇬🇧'}

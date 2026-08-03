@@ -250,12 +250,19 @@ export default function App() {
 
     // Update stats
     setUserStats(prev => {
-      const newHistory = [...prev.history, result];
-      const totalTests = newHistory.length;
+      const existingIdx = prev.history.findIndex(h => h.id === result.id);
+      let newHistory = [...prev.history];
+      if (existingIdx >= 0) {
+        newHistory[existingIdx] = result;
+      } else {
+        newHistory.push(result);
+      }
+
+      const totalTests = newHistory.filter(h => h.sessionStatus === 'Completed' || !h.sessionStatus).length;
       const totalTime = prev.totalTimeSpentSeconds + result.elapsedSeconds;
       const highest = Math.max(prev.highestWpm, result.netWpm);
-      const avgWpm = Math.round(newHistory.reduce((acc, h) => acc + h.netWpm, 0) / totalTests);
-      const avgAcc = Math.round(newHistory.reduce((acc, h) => acc + h.accuracy, 0) / totalTests);
+      const avgWpm = Math.round(newHistory.reduce((acc, h) => acc + h.netWpm, 0) / (newHistory.length || 1));
+      const avgAcc = Math.round(newHistory.reduce((acc, h) => acc + h.accuracy, 0) / (newHistory.length || 1));
 
       // Streak calculation
       const today = new Date().toISOString().split('T')[0];
@@ -264,7 +271,7 @@ export default function App() {
         streak += 1;
       }
 
-      return {
+      const updated: UserStats = {
         totalTestsCompleted: totalTests,
         totalTimeSpentSeconds: totalTime,
         highestWpm: highest,
@@ -275,8 +282,38 @@ export default function App() {
         history: newHistory,
         unlockedBadges: prev.unlockedBadges
       };
+
+      try {
+        localStorage.setItem('nepali_typing_user_stats', JSON.stringify(updated));
+      } catch (e) {}
+
+      return updated;
     });
   };
+
+  // Live Session Update Handler (Realtime tracking for Analytics)
+  const handleLiveSessionUpdate = useCallback((session: TestResult) => {
+    setUserStats(prev => {
+      const existingIdx = prev.history.findIndex(h => h.id === session.id);
+      let newHistory = [...prev.history];
+      if (existingIdx >= 0) {
+        newHistory[existingIdx] = session;
+      } else {
+        newHistory.push(session);
+      }
+
+      const updated: UserStats = {
+        ...prev,
+        history: newHistory
+      };
+
+      try {
+        localStorage.setItem('nepali_typing_user_stats', JSON.stringify(updated));
+      } catch (e) {}
+
+      return updated;
+    });
+  }, []);
 
   const handleRestartTest = () => {
     setTargetText(generateTargetText());
@@ -367,6 +404,7 @@ export default function App() {
                 onKeypressMetric={handleKeypressMetric}
                 onNextHintKeyChange={handleNextHintKeyChange}
                 onLiveStatsChange={setLiveStats}
+                onLiveSessionUpdate={handleLiveSessionUpdate}
               />
             )}
 
@@ -476,8 +514,6 @@ export default function App() {
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
             <span>Standardized Devanagari Unicode Assessment & Certification Engine</span>
             <span className="flex items-center gap-2">
-              <span>Press <kbd className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700">Ctrl + Space</kbd> to toggle language</span>
-              <span>&bull;</span>
               <span>v2.5.0</span>
             </span>
           </div>
