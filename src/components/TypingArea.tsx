@@ -13,7 +13,7 @@ import {
   Lightbulb,
   HelpCircle
 } from 'lucide-react';
-import { TestSettings, TestResult, KeyStats, LiveStats, SessionStatus } from '../types';
+import { TestSettings, TestResult, KeyStats, LiveStats, SessionStatus, DetailedWordError, DetailedCharError } from '../types';
 import { transliterateWordRuleBased, getWordSuggestions, getRomanizedHintForWord } from '../utils/nepaliTransliteration';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
@@ -85,6 +85,11 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const mistypedCharsRef = useRef<Record<string, number>>({});
   const lastKeyTimeRef = useRef<number | null>(null);
   const wpmSamplesRef = useRef<{ second: number; wpm: number; rawWpm: number; errors: number }[]>([]);
+  const currentWordMistakesRef = useRef<number>(0);
+  const currentWordBackspacesRef = useRef<number>(0);
+  const currentWordStartTimeRef = useRef<number | null>(null);
+  const wordErrorsListRef = useRef<DetailedWordError[]>([]);
+  const charErrorsListRef = useRef<DetailedCharError[]>([]);
 
   // DOM Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -302,6 +307,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       mistypedWordsMap: mistypedWordsRef.current,
       mistypedCharsMap: mistypedCharsRef.current,
       slowWordsMap: {},
+      wordErrors: [...wordErrorsListRef.current],
+      charErrors: [...charErrorsListRef.current],
       sampleText: targetText.substring(0, 100) + '...',
       categoryOrTitle: passageTitle || (
         settings.testType === 'legal'
@@ -350,6 +357,11 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     mistypedCharsRef.current = {};
     lastKeyTimeRef.current = null;
     wpmSamplesRef.current = [];
+    currentWordMistakesRef.current = 0;
+    currentWordBackspacesRef.current = 0;
+    currentWordStartTimeRef.current = null;
+    wordErrorsListRef.current = [];
+    charErrorsListRef.current = [];
 
     onLiveStatsChange?.({
       grossWpm: 0,
@@ -476,6 +488,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       mistypedWordsMap: mistypedWordsRef.current,
       mistypedCharsMap: mistypedCharsRef.current,
       slowWordsMap: {},
+      wordErrors: [...wordErrorsListRef.current],
+      charErrors: [...charErrorsListRef.current],
       sampleText: targetText.substring(0, 100) + '...',
       categoryOrTitle: passageTitle || (
         settings.testType === 'legal'

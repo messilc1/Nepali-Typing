@@ -105,6 +105,21 @@ export interface KeyStats {
   totalTimeMs: number;
 }
 
+export interface DetailedWordError {
+  targetWord: string;
+  typedWord: string;
+  mistakes: number;
+  corrected: boolean;
+  timeSpentMs?: number;
+  backspacesUsed?: number;
+}
+
+export interface DetailedCharError {
+  targetChar: string;
+  typedChar: string;
+  frequency: number;
+}
+
 export type SessionStatus = 'Completed' | 'Timed Out' | 'Abandoned' | 'Interrupted';
 
 export interface TestResult {
@@ -136,6 +151,8 @@ export interface TestResult {
   mistypedWordsMap: Record<string, number>; // word -> count
   mistypedCharsMap: Record<string, number>; // char -> count
   slowWordsMap: Record<string, number>; // word -> avg ms
+  wordErrors?: DetailedWordError[];
+  charErrors?: DetailedCharError[];
   sampleText: string;
   categoryOrTitle?: string;
 }

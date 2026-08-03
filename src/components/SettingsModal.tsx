@@ -1,19 +1,28 @@
-import React from 'react';
-import { X, Volume2, Type, Eye, Palette, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Volume2, Type, Eye, Palette, Check, Trash2, AlertTriangle } from 'lucide-react';
 import { TestSettings } from '../types';
 import { FontSelector } from './FontSelector';
 
 interface SettingsModalProps {
   settings: TestSettings;
   updateSettings: (partial: Partial<TestSettings>) => void;
+  onResetAnalytics?: () => void;
   onClose: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   updateSettings,
+  onResetAnalytics,
   onClose
 }) => {
+  const [showConfirmReset, setShowConfirmReset] = useState<boolean>(false);
+
+  const handleConfirmReset = () => {
+    onResetAnalytics?.();
+    setShowConfirmReset(false);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
       <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
@@ -134,8 +143,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           ))}
         </div>
 
-        {/* Done button */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+        {/* Reset Analytics Danger Zone */}
+        {onResetAnalytics && (
+          <div className="pt-4 border-t border-rose-100 dark:border-rose-950/80">
+            <label className="block text-xs font-bold uppercase tracking-wider text-rose-500 mb-2 flex items-center gap-1.5">
+              <Trash2 className="w-4 h-4 text-rose-500" /> Data & Analytics Management
+            </label>
+            <button
+              onClick={() => setShowConfirmReset(true)}
+              className="w-full py-2.5 px-4 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Reset Analytics History</span>
+            </button>
+          </div>
+        )}
+
+        {/* Save Preferences Button */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
           <button
             onClick={onClose}
             className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm shadow-md shadow-blue-500/20 transition-all"
@@ -145,6 +170,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
       </div>
+
+      {/* Confirmation Modal for Reset Analytics */}
+      {showConfirmReset && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 max-w-md w-full p-6 sm:p-8 rounded-3xl border border-rose-200 dark:border-rose-900 shadow-2xl space-y-6">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <AlertTriangle className="w-8 h-8 shrink-0" />
+              <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100">
+                Confirm Reset Analytics History
+              </h3>
+            </div>
+
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              This action will permanently delete all your typing history, performance records, charts, and analytics. This cannot be undone. Are you sure you want to continue?
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowConfirmReset(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReset}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Reset Analytics</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -340,6 +340,18 @@ export default function App() {
     }
   };
 
+  const handleClearHistory = useCallback(() => {
+    const resetStats: UserStats = {
+      ...INITIAL_USER_STATS,
+      lastPracticeDate: new Date().toISOString().split('T')[0]
+    };
+    setUserStats(resetStats);
+    try {
+      localStorage.setItem('nepali_typing_user_stats', JSON.stringify(resetStats));
+    } catch (e) {}
+    setKeyStatsMap({});
+  }, []);
+
   const handleNextHintKeyChange = useCallback((key: string | undefined) => {
     setNextHintKey(prev => (prev === key ? prev : key));
   }, []);
@@ -444,10 +456,7 @@ export default function App() {
             userStats={userStats}
             keyStatsMap={keyStatsMap}
             onStartTargetedPractice={handleLaunchTargetedPractice}
-            onClearHistory={() => {
-              setUserStats(INITIAL_USER_STATS);
-              localStorage.removeItem('nepali_typing_user_stats');
-            }}
+            onClearHistory={handleClearHistory}
           />
         )}
 
@@ -525,6 +534,7 @@ export default function App() {
         <SettingsModal
           settings={settings}
           updateSettings={updateSettings}
+          onResetAnalytics={handleClearHistory}
           onClose={() => setShowSettingsModal(false)}
         />
       )}
