@@ -146,6 +146,7 @@ export default function App() {
   const [keyStatsMap, setKeyStatsMap] = useState<Record<string, KeyStats>>({});
   const [activeKey, setActiveKey] = useState<string | undefined>(undefined);
   const [nextHintKey, setNextHintKey] = useState<string | undefined>(undefined);
+  const [sessionKey, setSessionKey] = useState<number>(0);
 
   const typingAreaRef = useRef<TypingAreaRef>(null);
 
@@ -316,9 +317,12 @@ export default function App() {
   }, []);
 
   const handleRestartTest = () => {
+    setSessionKey(prev => prev + 1);
     setTargetText(generateTargetText());
     setActiveResult(null);
-    typingAreaRef.current?.focusInput();
+    setTimeout(() => {
+      typingAreaRef.current?.focusInput();
+    }, 50);
   };
 
   const handleLaunchTargetedPractice = (items: string[]) => {
@@ -405,6 +409,7 @@ export default function App() {
               />
             ) : (
               <TypingArea
+                key={sessionKey}
                 ref={typingAreaRef}
                 settings={settings}
                 updateSettings={updateSettings}

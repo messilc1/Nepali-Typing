@@ -28,6 +28,7 @@ import {
   Legend
 } from 'recharts';
 import { CertificationAttempt } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 interface OfficialCertificateDocumentProps {
   attempt: CertificationAttempt;
@@ -182,11 +183,11 @@ export const OfficialCertificateDocument: React.FC<OfficialCertificateDocumentPr
             {/* Page 1 Header */}
             <div className="border-b-2 border-slate-900 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <div className="text-2xl font-black tracking-tight text-amber-600 flex items-center gap-2">
-                  <Award className="w-7 h-7 text-amber-500" />
-                  <span>Nepali Typing Pro</span>
+                <div className="flex items-center gap-3">
+                  <BrandLogo size={44} />
+                  <span className="text-2xl font-black tracking-tight text-slate-900">Nepali Typing Pro</span>
                 </div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-950 uppercase tracking-wide mt-0.5">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-950 uppercase tracking-wide mt-2">
                   Official Certification Examination Report
                 </h1>
                 <p className="text-xs text-slate-600 font-medium max-w-xl mt-1">

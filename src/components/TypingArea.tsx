@@ -95,6 +95,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const inputRef = useRef<HTMLInputElement>(null);
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textContainerRef = useRef<HTMLDivElement>(null);
 
   const targetWords = useMemo(() => targetText.trim().split(/\s+/).filter(Boolean), [targetText]);
 
@@ -548,13 +549,21 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     };
   }, [isTestRunning, isTestFinished, startTime, settings.testType, settings.durationSeconds, computeLiveStats, finishTest, onLiveStatsChange, emitLiveSession]);
 
+  const handleLocalRestart = useCallback(() => {
+    if (isTestRunningRef.current) {
+      emitLiveSession('Abandoned');
+    }
+    resetState();
+    onRestartTest();
+  }, [emitLiveSession, resetState, onRestartTest]);
+
   // Handle Keystrokes & Romanized Conversion
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isTestFinishedRef.current) return;
 
     if (e.ctrlKey && e.key === 'Enter') {
       e.preventDefault();
-      onRestartTest();
+      handleLocalRestart();
       return;
     }
 
@@ -744,16 +753,24 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     }
   };
 
-  // Scroll current word into view smoothly
+  // Smooth synchronized auto-scrolling: keeps active line at ~33% container height so 2-3 lines ahead remain visible
   useEffect(() => {
-    if (activeWordRef.current) {
-      activeWordRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'nearest'
+    if (activeWordRef.current && textContainerRef.current) {
+      const container = textContainerRef.current;
+      const wordEl = activeWordRef.current;
+
+      const containerRect = container.getBoundingClientRect();
+      const wordRect = wordEl.getBoundingClientRect();
+
+      const relativeTop = wordRect.top - containerRect.top + container.scrollTop;
+      const targetScrollTop = relativeTop - container.clientHeight * 0.33;
+
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'smooth'
       });
     }
-  }, [currentWordIndex]);
+  }, [currentWordIndex, typedInput]);
 
   // Compute font size class
   const getFontSizeClass = () => {
@@ -913,7 +930,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
           {/* Restart Button */}
           <button
-            onClick={onRestartTest}
+            onClick={handleLocalRestart}
             title="Restart Test (Ctrl + Enter)"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold transition-all"
           >
@@ -1055,6 +1072,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         {/* Text View Container */}
         <div
+          ref={textContainerRef}
           className={`w-full flex flex-wrap gap-x-3 gap-y-2 text-slate-400 dark:text-slate-500 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 py-4 scroll-smooth ${getFontSizeClass()}`}
           style={getFontFamilyStyle()}
         >

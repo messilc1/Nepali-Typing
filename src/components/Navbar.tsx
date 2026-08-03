@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { NavigationTab, TestSettings, UserStats } from '../types';
 import { FontSelector } from './FontSelector';
+import { BrandLogo } from './BrandLogo';
 
 interface NavbarProps {
   activeTab: NavigationTab;
@@ -72,20 +73,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-3 cursor-pointer shrink-0 select-none py-1"
             onClick={() => handleTabClick('test')}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
-              <Keyboard className="w-5 h-5" />
-            </div>
+            <BrandLogo size={42} />
             <div className="flex flex-col justify-center min-w-0">
               <div className="flex items-center gap-2 leading-none">
-                <span className="font-extrabold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent whitespace-nowrap">
+                <span className="font-black text-lg sm:text-xl tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
                   Nepali Typing Pro
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shrink-0">
                   Unicode
                 </span>
               </div>
-              <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 font-medium hidden sm:block whitespace-nowrap mt-0.5">
-                Romanized Nepali & English Speed Engine
+              <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400 font-semibold hidden sm:block whitespace-nowrap mt-0.5">
+                Standard Devanagari & English Typing Engine
               </p>
             </div>
           </div>
