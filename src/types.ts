@@ -16,7 +16,9 @@ export interface LiveStats {
   consistency: number;
 }
 
-export type NavigationTab = 'test' | 'english' | 'practice' | 'improvement' | 'legal' | 'analytics' | 'certification' | 'about';
+export type NavigationTab = 'test' | 'english' | 'arena' | 'practice' | 'improvement' | 'legal' | 'analytics' | 'certification' | 'about';
+
+export * from './types/arenaTypes';
 
 export type LanguageMode = 'nepali' | 'english';
 

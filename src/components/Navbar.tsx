@@ -16,7 +16,8 @@ import {
   Info,
   Menu,
   X,
-  GraduationCap
+  GraduationCap,
+  Gamepad2
 } from 'lucide-react';
 import { NavigationTab, TestSettings, UserStats } from '../types';
 import { FontSelector } from './FontSelector';
@@ -211,6 +212,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
+              id="nav-tab-arena"
+              onClick={() => handleTabClick('arena')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'arena'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
+                  : 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800'
+              }`}
+            >
+              <Gamepad2 className="w-4 h-4 text-indigo-500" />
+              <span>🎮 Typing Arena</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded whitespace-nowrap ${
+                activeTab === 'arena'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-amber-400/20 text-amber-600 dark:text-amber-300'
+              }`}>
+                PRO
+              </span>
+            </button>
+
+            <button
               id="nav-tab-practice"
               onClick={() => handleTabClick('practice')}
               className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
@@ -323,6 +344,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <GraduationCap className="w-4 h-4 text-emerald-500" />
                 <span>English Typing</span>
+              </button>
+
+              <button
+                onClick={() => handleTabClick('arena')}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                  activeTab === 'arena'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 font-black shadow-sm'
+                    : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                }`}
+              >
+                <Gamepad2 className="w-4 h-4 text-indigo-500" />
+                <span>🎮 Arena</span>
               </button>
 
               <button

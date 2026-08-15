@@ -1,6 +1,6 @@
 {
   "name": "Nepali Typing Pro",
-  "description": "Professional Romanized Nepali Unicode typing tutor with comprehensive English Typing Academy (7 levels, WPM milestones, keyboard guide, and AI weak-key improvement).",
+  "description": "Professional Romanized Nepali Unicode typing tutor, English Typing Academy, and full-featured competitive Typing Arena with Career Mode, AI bot battles, boss fights, multiplayer racing, and analytics.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

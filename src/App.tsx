@@ -12,6 +12,7 @@ import { TypingImprovementView } from './components/TypingImprovementView';
 import { CertificationView } from './components/CertificationView';
 import { AboutView } from './components/AboutView';
 import { EnglishTypingSection } from './components/english/EnglishTypingSection';
+import { TypingArenaHub } from './components/arena/TypingArenaHub';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
 
@@ -83,11 +84,11 @@ export default function App() {
   const [activeTab, setActiveTabState] = useState<NavigationTab>(() => {
     try {
       const hash = window.location.hash.replace('#', '');
-      if (['test', 'english', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+      if (['test', 'english', 'arena', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
         return hash as NavigationTab;
       }
       const saved = localStorage.getItem('nepali_typing_active_tab');
-      if (saved && ['test', 'english', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(saved)) {
+      if (saved && ['test', 'english', 'arena', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(saved)) {
         return saved as NavigationTab;
       }
     } catch {}
@@ -108,7 +109,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['test', 'english', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+      if (['test', 'english', 'arena', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
         setActiveTabState(hash as NavigationTab);
       }
     };
@@ -450,6 +451,12 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'arena' && (
+          <TypingArenaHub
+            liveKeyStatsMap={keyStatsMap}
+          />
+        )}
+
         {activeTab === 'practice' && (
           <PracticeMode
             settings={settings}
@@ -540,6 +547,8 @@ export default function App() {
               <button onClick={() => setActiveTab('test')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Nepali Typing</button>
               <span>&bull;</span>
               <button onClick={() => setActiveTab('english')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-bold text-emerald-600 dark:text-emerald-400">English Typing</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('arena')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-bold text-indigo-600 dark:text-indigo-400">🎮 Typing Arena</button>
               <span>&bull;</span>
               <button onClick={() => setActiveTab('practice')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Practice Mode</button>
               <span>&bull;</span>
