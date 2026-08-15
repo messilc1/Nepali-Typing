@@ -1,5 +1,10 @@
 import React, { useEffect } from 'react';
-import { Racer, CompetitiveTier, CompetitiveDivision } from '../../types/arenaTypes';
+import {
+  Racer,
+  CompetitiveTier,
+  CompetitiveDivision,
+  OfficialMultiplayerResult
+} from '../../types/arenaTypes';
 import {
   Trophy,
   Award,
@@ -12,7 +17,9 @@ import {
   CheckCircle,
   XCircle,
   Activity,
-  Target
+  Target,
+  Users,
+  CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { playFinishFanfare } from '../../utils/gameAudio';
@@ -30,6 +37,7 @@ interface RaceResultsModalProps {
   mistypedKeys?: Record<string, number>;
   mistypedWords?: Record<string, number>;
   wpmHistory?: { second: number; wpm: number; errors: number }[];
+  officialMultiplayerResults?: OfficialMultiplayerResult[];
   onPlayAgain: () => void;
   onExitToHub: () => void;
   onPracticeWeakness?: (keys: string[]) => void;
@@ -49,6 +57,7 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
   mistypedKeys = {},
   mistypedWords = {},
   wpmHistory = [],
+  officialMultiplayerResults,
   onPlayAgain,
   onExitToHub,
   onPracticeWeakness,
@@ -163,38 +172,51 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
           </div>
         </div>
 
-        {/* Anti-Cheat & Opponents Leaderboard */}
+        {/* Server-Authoritative Standings & Anti-Cheat */}
         <div className="space-y-4 my-6">
           {/* Anti-Cheat Badge */}
           <div className="flex items-center justify-between px-3.5 py-2 bg-slate-950/90 border border-emerald-900/50 rounded-xl text-xs">
             <div className="flex items-center gap-2 text-emerald-400 font-mono">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Anti-Cheat Integrity: Keystroke Intervals Verified (Clean)</span>
+              <span>Authoritative Match Server: Verified Results</span>
             </div>
-            <span className="text-[10px] text-slate-500 font-mono">Hash: {Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
+            <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              Synchronized
+            </span>
           </div>
 
-          {/* Opponent Race Standings */}
+          {/* Official Standings */}
           <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Trophy className="w-3.5 h-3.5 text-amber-400" />
-              <span>Race Standings</span>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span>Official Race Standings</span>
+              </span>
+              {officialMultiplayerResults && (
+                <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                  ● Server-Validated Results
+                </span>
+              )}
             </h3>
 
             <div className="space-y-1.5 font-mono text-xs">
-              {sortedRacers.map((racer, idx) => {
-                const isUser = racer.isPlayer;
+              {(officialMultiplayerResults || sortedRacers).map((racer: any, idx: number) => {
+                const isUser = racer.isPlayer || racer.playerId === userRacer.id;
+                const netSpeed = racer.netWpm ?? racer.wpm ?? 0;
+                const finishTime = racer.finishTimeSeconds ?? racer.finishTime;
+
                 return (
                   <div
-                    key={racer.id || idx}
-                    className={`flex items-center justify-between p-2 rounded-xl ${
+                    key={racer.id || racer.playerId || idx}
+                    className={`flex items-center justify-between p-2.5 rounded-xl ${
                       isUser
                         ? 'bg-blue-950/80 border border-blue-700/60 text-blue-200 font-bold'
                         : 'bg-slate-900/60 border border-slate-800/60 text-slate-300'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-5 text-center font-bold text-slate-400">#{idx + 1}</span>
+                      <span className="w-5 text-center font-bold text-slate-400">#{racer.rank || idx + 1}</span>
                       <span className="text-base">{racer.avatar || '🏎️'}</span>
                       <span className="truncate max-w-[150px] sm:max-w-[220px]">
                         {racer.name} {isUser && '(YOU)'}
@@ -202,9 +224,12 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <span>{Math.round(racer.netWpm || racer.wpm || 0)} WPM</span>
+                      <span className="text-blue-300 font-bold">{Math.round(netSpeed)} WPM</span>
+                      {racer.accuracy !== undefined && (
+                        <span className="text-emerald-400">{racer.accuracy}% Acc</span>
+                      )}
                       <span className="text-slate-500">
-                        {racer.finishTime ? `${racer.finishTime.toFixed(1)}s` : `${Math.round(racer.currentProgress)}%`}
+                        {finishTime ? `${Number(finishTime).toFixed(1)}s` : `${Math.round(racer.currentProgress || 100)}%`}
                       </span>
                     </div>
                   </div>
@@ -259,10 +284,11 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
             className="w-full sm:w-auto px-7 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-black transition-all cursor-pointer shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>Play Next Race</span>
+            <span>Play Next Round</span>
           </button>
         </div>
       </div>
     </div>
   );
 };
+

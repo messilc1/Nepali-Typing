@@ -205,3 +205,55 @@ export interface RoomConfig {
   totalRounds: number;
   playerScores: Record<string, number>;
 }
+
+export interface MultiplayerPlayer {
+  id: string;
+  name: string;
+  avatar: string;
+  isHost: boolean;
+  isReady: boolean;
+  connected: boolean;
+  lastHeartbeat?: number;
+  progress: number;
+  wpm: number;
+  netWpm: number;
+  accuracy: number;
+  mistakes: number;
+  charsTyped?: number;
+  wordsTyped?: number;
+  finished: boolean;
+  finishTimeMs: number | null;
+  rank: number | null;
+}
+
+export interface OfficialMultiplayerResult {
+  playerId: string;
+  name: string;
+  avatar: string;
+  rank: number;
+  netWpm: number;
+  grossWpm: number;
+  accuracy: number;
+  mistakes: number;
+  finishTimeSeconds: number;
+  isWinner: boolean;
+}
+
+export interface MultiplayerLobbyState {
+  roomId: string;
+  matchId: string;
+  language: ArenaLanguage;
+  format: 'single' | 'best-of-3' | 'best-of-5';
+  status: 'lobby' | 'countdown' | 'in_progress' | 'finished';
+  targetText: string;
+  textId: string;
+  textTitle: string;
+  currentRound: number;
+  totalRounds: number;
+  scores: Record<string, number>;
+  countdownDurationMs: number;
+  startTimestamp: number | null;
+  players: MultiplayerPlayer[];
+  results: OfficialMultiplayerResult[];
+}
+

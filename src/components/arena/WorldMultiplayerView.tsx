@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ArenaProfile, ArenaLanguage, Racer } from '../../types/arenaTypes';
-import { QUICK_RACE_TEXTS } from '../../data/arenaData';
+import {
+  ArenaProfile,
+  ArenaLanguage,
+  MultiplayerLobbyState,
+  MultiplayerPlayer
+} from '../../types/arenaTypes';
+import {
+  multiplayerSocket,
+  SocketConnectionStatus,
+  CountdownEventData
+} from '../../services/multiplayerSocket';
 import {
   Globe,
   Users,
@@ -11,17 +20,20 @@ import {
   Award,
   Search,
   Radio,
-  CheckCircle2
+  CheckCircle2,
+  Wifi,
+  WifiOff,
+  AlertCircle
 } from 'lucide-react';
 
 interface WorldMultiplayerViewProps {
   profile: ArenaProfile;
   language: ArenaLanguage;
   isRanked?: boolean;
-  onLaunchMatch: (config: {
-    opponents: Racer[];
-    text: string;
-    raceTitle: string;
+  onLaunchMultiplayerMatch: (config: {
+    lobby: MultiplayerLobbyState;
+    countdownData: CountdownEventData;
+    isHost: boolean;
   }) => void;
   onBack: () => void;
 }
@@ -30,14 +42,66 @@ export const WorldMultiplayerView: React.FC<WorldMultiplayerViewProps> = ({
   profile,
   language,
   isRanked = false,
-  onLaunchMatch,
+  onLaunchMultiplayerMatch,
   onBack
 }) => {
-  const [matchmakingState, setMatchmakingState] = useState<'idle' | 'searching' | 'found'>('idle');
+  const [matchmakingState, setMatchmakingState] = useState<'idle' | 'searching' | 'matched'>('idle');
   const [queueElapsedSec, setQueueElapsedSec] = useState<number>(0);
-  const [foundOpponent, setFoundOpponent] = useState<Racer | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<SocketConnectionStatus>('disconnected');
+  const [lobbyState, setLobbyState] = useState<MultiplayerLobbyState | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Matchmaking ticker
+  const playerId = multiplayerSocket.getPlayerId();
+  const displayName = (() => {
+    try {
+      const saved = localStorage.getItem('ntp_user_display_name');
+      if (saved) return saved;
+    } catch {}
+    return 'Subhash Lamichhane';
+  })();
+
+  useEffect(() => {
+    const unsubStatus = multiplayerSocket.onStatusChange((status) => {
+      setConnectionStatus(status);
+      if (status === 'connected') {
+        setErrorMessage(null);
+      }
+    });
+
+    const unsubLobby = multiplayerSocket.onLobbyState((lobby) => {
+      setLobbyState(lobby);
+      if (matchmakingState === 'searching' && lobby.players.length >= 1) {
+        setMatchmakingState('matched');
+      }
+    });
+
+    const unsubCountdown = multiplayerSocket.onCountdown((data) => {
+      if (lobbyState) {
+        const isHost = lobbyState.players.find((p) => p.id === playerId)?.isHost ?? false;
+        onLaunchMultiplayerMatch({
+          lobby: lobbyState,
+          countdownData: data,
+          isHost
+        });
+      }
+    });
+
+    const unsubError = multiplayerSocket.onError((err) => {
+      setErrorMessage(err);
+      setMatchmakingState('idle');
+    });
+
+    multiplayerSocket.connect();
+
+    return () => {
+      unsubStatus();
+      unsubLobby();
+      unsubCountdown();
+      unsubError();
+    };
+  }, [lobbyState, matchmakingState, playerId, onLaunchMultiplayerMatch]);
+
+  // Queue timer ticker
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (matchmakingState === 'searching') {
@@ -45,71 +109,39 @@ export const WorldMultiplayerView: React.FC<WorldMultiplayerViewProps> = ({
       interval = setInterval(() => {
         setQueueElapsedSec((prev) => prev + 1);
       }, 1000);
-
-      // Simulate realistic match finding after 2.5 - 4 seconds
-      const findTimeout = setTimeout(() => {
-        // Generate a matched player with similar rating and WPM
-        const opponentRating = Math.max(800, profile.rating + Math.round((Math.random() - 0.45) * 80));
-        const opponentWpm = Math.max(25, (profile.records.highestWpmEnglish || 55) + Math.round((Math.random() - 0.45) * 8));
-
-        const namesPool = [
-          'Aayush_Karki_NP',
-          'Pooja_Kathmandu',
-          'CyberTypist_99',
-          'PokharaRacer',
-          'Devon_WPM',
-          'Sita_Gautam',
-          'ApexRunner'
-        ];
-        const randomName = namesPool[Math.floor(Math.random() * namesPool.length)];
-        const avatarPool = ['🏎️', '🚀', '⚡', '🦅', '🔥', '👑'];
-        const randomAvatar = avatarPool[Math.floor(Math.random() * avatarPool.length)];
-
-        const matched: Racer = {
-          id: `world-opp-${Date.now()}`,
-          name: randomName,
-          avatar: randomAvatar,
-          isPlayer: false,
-          isAi: true, // Powered by realistic simulation
-          wpm: opponentWpm,
-          rating: opponentRating,
-          currentProgress: 0,
-          position: 2,
-          status: 'ready'
-        };
-
-        setFoundOpponent(matched);
-        setMatchmakingState('found');
-      }, 3000);
-
-      return () => {
-        clearInterval(interval);
-        clearTimeout(findTimeout);
-      };
     }
-  }, [matchmakingState, profile.rating, profile.records.highestWpmEnglish]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [matchmakingState]);
 
-  const handleStartSearching = () => {
+  const handleStartSearching = async () => {
     setMatchmakingState('searching');
+    setErrorMessage(null);
+
+    await multiplayerSocket.quickMatch(
+      {
+        id: playerId,
+        name: displayName,
+        avatar: profile.selectedAvatar || '🏎️'
+      },
+      language
+    );
   };
 
   const handleCancelSearch = () => {
+    multiplayerSocket.leaveLobby();
     setMatchmakingState('idle');
-    setFoundOpponent(null);
+    setLobbyState(null);
   };
 
-  const handleLaunchFoundMatch = () => {
-    if (!foundOpponent) return;
-
-    const samplePool = QUICK_RACE_TEXTS[language] || QUICK_RACE_TEXTS.english;
-    const selectedText = samplePool[Math.floor(Math.random() * samplePool.length)];
-
-    onLaunchMatch({
-      opponents: [foundOpponent],
-      text: selectedText,
-      raceTitle: `${isRanked ? 'Competitive Ranked 1v1' : 'World Match'} vs ${foundOpponent.name}`
-    });
+  const handleHostStart = () => {
+    if (lobbyState) {
+      multiplayerSocket.startMatch(4000);
+    }
   };
+
+  const isHost = lobbyState?.players.find((p) => p.id === playerId)?.isHost ?? false;
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
@@ -118,127 +150,165 @@ export const WorldMultiplayerView: React.FC<WorldMultiplayerViewProps> = ({
         <div className="space-y-1 text-center sm:text-left">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 border border-blue-500/40 rounded-full text-blue-300 text-xs font-bold font-mono">
             <Globe className="w-3.5 h-3.5" />
-            <span>{isRanked ? 'COMPETITIVE RANKED ARENA' : 'WORLDWIDE MULTIPLAYER'}</span>
+            <span>{isRanked ? 'COMPETITIVE RANKED QUEUE' : 'GLOBAL QUICK PLAY'}</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            {isRanked ? 'Official Competitive Rating Match' : 'Play With Anyone Worldwide'}
+            {isRanked ? 'Ranked Matchmaking' : 'World Matchmaking'}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-xl">
-            Match with live typists near your skill tier ({profile.tier} {profile.division} &bull; Rating: {profile.rating}). Gain MMR and climb the weekly leagues.
+          <p className="text-sm text-slate-400">
+            Compete live against other real typists in server-authoritative matches.
           </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+              connectionStatus === 'connected'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+            }`}
+          >
+            {connectionStatus === 'connected' ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <Wifi className="w-3.5 h-3.5" />
+                <span>Live Server</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3.5 h-3.5" />
+                <span>Connecting...</span>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold border border-slate-700 transition"
+          >
+            Back to Arena
+          </button>
         </div>
       </div>
 
-      {/* Matchmaking Lobby Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 text-slate-200">
+      {errorMessage && (
+        <div className="p-4 bg-rose-950/50 border border-rose-800/80 rounded-2xl flex items-center gap-3 text-rose-300 text-sm animate-fade-in">
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* Main Matchmaking Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center shadow-xl relative overflow-hidden">
         {matchmakingState === 'idle' && (
-          <div className="space-y-6 text-center py-6">
-            <div className="w-20 h-20 rounded-3xl bg-blue-950/80 border border-blue-800 mx-auto flex items-center justify-center text-4xl shadow-xl shadow-blue-950/50">
-              <Globe className="w-10 h-10 text-blue-400 animate-spin-slow" />
+          <div className="max-w-md mx-auto space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-3xl shadow-inner">
+              <Globe className="w-10 h-10 text-blue-400 animate-pulse" />
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-xl sm:text-2xl font-black text-white">
-                Find Random Opponent
-              </h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                The matchmaking system pairs you with someone of similar WPM and accuracy in {language === 'nepali' ? 'Nepali Romanized' : 'English'}.
+            <div>
+              <h3 className="text-2xl font-black text-white">Find Opponent</h3>
+              <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+                Connect to the live match queue for{' '}
+                <span className="text-blue-300 font-bold">
+                  {language === 'nepali' ? 'Nepali Romanized Unicode' : 'English Velocity'}
+                </span>
+                .
               </p>
             </div>
 
-            <div className="flex items-center justify-center gap-6 py-2 font-mono text-xs">
-              <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl">
-                <span className="text-slate-500 block">YOUR RATING</span>
-                <strong className="text-indigo-300 font-bold text-sm">{profile.rating} MMR</strong>
-              </div>
-              <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl">
-                <span className="text-slate-500 block">CURRENT RANK</span>
-                <strong className="text-blue-400 font-bold text-sm">{profile.tier} {profile.division}</strong>
-              </div>
-              <div className="bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl">
-                <span className="text-slate-500 block">LANGUAGE</span>
-                <strong className="text-emerald-400 font-bold text-sm uppercase">{language}</strong>
-              </div>
+            <div className="flex items-center justify-center gap-4 text-xs text-slate-400">
+              <span className="px-3 py-1 bg-slate-950 rounded-lg border border-slate-800">
+                Your Rating: <strong className="text-amber-400">{profile.rating} RP</strong>
+              </span>
+              <span className="px-3 py-1 bg-slate-950 rounded-lg border border-slate-800">
+                Rank: <strong className="text-indigo-300">{profile.tier} {profile.division}</strong>
+              </span>
             </div>
 
-            <div className="pt-4 flex items-center justify-center gap-3">
-              <button
-                onClick={onBack}
-                className="px-5 py-3 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
-              >
-                Back to Arena Hub
-              </button>
-
-              <button
-                onClick={handleStartSearching}
-                className="px-8 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm transition-all cursor-pointer shadow-lg shadow-blue-600/30 flex items-center gap-2"
-              >
-                <Search className="w-4 h-4" />
-                <span>Find Match Now</span>
-              </button>
-            </div>
+            <button
+              onClick={handleStartSearching}
+              disabled={connectionStatus !== 'connected'}
+              className="w-full py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-blue-600/30 flex items-center justify-center gap-2 transition disabled:opacity-50"
+            >
+              <Zap className="w-5 h-5 fill-white" />
+              <span>FIND MATCH NOW</span>
+            </button>
           </div>
         )}
 
         {matchmakingState === 'searching' && (
-          <div className="space-y-6 text-center py-10">
-            <div className="w-20 h-20 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin mx-auto flex items-center justify-center">
-              <Radio className="w-8 h-8 text-blue-400 animate-pulse" />
+          <div className="max-w-md mx-auto space-y-6 animate-fade-in">
+            <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-4 border-blue-500/20 border-t-blue-400 animate-spin" />
+              <Radio className="w-10 h-10 text-blue-400 animate-pulse" />
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-2xl font-black text-white">Searching for Opponent...</h3>
-              <p className="text-xs text-slate-400 font-mono">
-                Matching player pool ({queueElapsedSec}s in queue)
+            <div>
+              <h3 className="text-2xl font-black text-white">Searching for Competitors...</h3>
+              <p className="text-sm text-slate-400 mt-1 font-mono">
+                Queue Time: <span className="text-white font-bold">{queueElapsedSec}s</span>
               </p>
             </div>
 
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Matching you with players in your skill bracket...
+            </p>
+
             <button
               onClick={handleCancelSearch}
-              className="px-6 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+              className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs border border-slate-700 transition"
             >
               Cancel Matchmaking
             </button>
           </div>
         )}
 
-        {matchmakingState === 'found' && foundOpponent && (
-          <div className="space-y-6 text-center py-6 animate-in zoom-in-95">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-500/50 rounded-full text-emerald-300 text-xs font-bold font-mono">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>MATCH FOUND &mdash; READY FOR BATTLE</span>
+        {matchmakingState === 'matched' && lobbyState && (
+          <div className="max-w-lg mx-auto space-y-6 animate-fade-in">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-2xl">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
 
-            {/* Vs Display Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-4 max-w-lg mx-auto">
-              {/* You */}
-              <div className="bg-slate-950 border border-blue-600/60 rounded-2xl p-4 text-center">
-                <span className="text-3xl block mb-1">{profile.selectedAvatar || '🏎️'}</span>
-                <h4 className="text-sm font-black text-blue-300">You</h4>
-                <span className="text-xs font-mono text-slate-400 block">{profile.rating} MMR</span>
-              </div>
-
-              {/* VS Banner */}
-              <div className="text-center font-black font-mono text-2xl text-amber-400">
-                VS
-              </div>
-
-              {/* Opponent */}
-              <div className="bg-slate-950 border border-rose-600/60 rounded-2xl p-4 text-center">
-                <span className="text-3xl block mb-1">{foundOpponent.avatar}</span>
-                <h4 className="text-sm font-black text-rose-300 truncate">{foundOpponent.name}</h4>
-                <span className="text-xs font-mono text-slate-400 block">{foundOpponent.rating} MMR</span>
-              </div>
+            <div>
+              <h3 className="text-2xl font-black text-white">Match Lobby Formed!</h3>
+              <p className="text-xs text-slate-400 font-mono mt-1">
+                Lobby Code: <strong className="text-indigo-400">{lobbyState.roomId}</strong> • Match: <strong className="text-amber-300">{lobbyState.matchId}</strong>
+              </p>
             </div>
 
-            <div className="pt-4">
-              <button
-                onClick={handleLaunchFoundMatch}
-                className="px-10 py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-base transition-all cursor-pointer shadow-xl shadow-blue-600/40 inline-flex items-center gap-2"
-              >
-                <Play className="w-5 h-5 fill-current" />
-                <span>Enter Arena Track (3..2..1..GO)</span>
-              </button>
+            {/* Players in this public match */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+              {lobbyState.players.map((p) => (
+                <div
+                  key={p.id}
+                  className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xl">
+                    {p.avatar || '🏎️'}
+                  </div>
+                  <div className="truncate">
+                    <div className="text-sm font-bold text-white truncate">{p.name}</div>
+                    <div className="text-[11px] text-emerald-400 font-mono">🟢 Ready</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-center gap-3 pt-2">
+              {isHost ? (
+                <button
+                  onClick={handleHostStart}
+                  className="px-8 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white rounded-2xl font-black text-sm tracking-wide shadow-xl shadow-emerald-600/30 flex items-center gap-2 transition"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>START SYNCHRONIZED RACE</span>
+                </button>
+              ) : (
+                <div className="text-sm text-slate-300 font-medium animate-pulse">
+                  Waiting for host to initiate countdown...
+                </div>
+              )}
             </div>
           </div>
         )}

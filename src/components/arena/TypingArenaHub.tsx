@@ -5,7 +5,9 @@ import {
   ArenaGameMode,
   Racer,
   CareerStage,
-  BossChallenge
+  BossChallenge,
+  MultiplayerLobbyState,
+  OfficialMultiplayerResult
 } from '../../types/arenaTypes';
 import {
   INITIAL_ARENA_PROFILE,
@@ -18,6 +20,10 @@ import {
   AVATAR_OPTIONS,
   TITLE_OPTIONS
 } from '../../data/arenaData';
+import {
+  multiplayerSocket,
+  CountdownEventData
+} from '../../services/multiplayerSocket';
 import { ArenaTypingEngine } from './ArenaTypingEngine';
 import { RaceResultsModal } from './RaceResultsModal';
 import { CareerModeView } from './CareerModeView';
@@ -111,6 +117,13 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
     isDaily?: boolean;
   } | null>(null);
 
+  // Authoritative Multiplayer Match Session
+  const [multiplayerMatchInfo, setMultiplayerMatchInfo] = useState<{
+    lobby: MultiplayerLobbyState;
+    countdownData: CountdownEventData;
+    isHost: boolean;
+  } | null>(null);
+
   // Post Race Results Modal State
   const [raceResultsData, setRaceResultsData] = useState<{
     userRacer: Racer;
@@ -122,7 +135,38 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
     mistypedWords: Record<string, number>;
     wpmHistory: { second: number; wpm: number; errors: number }[];
     isNewPersonalBest: boolean;
+    officialMultiplayerResults?: OfficialMultiplayerResult[];
   } | null>(null);
+
+  // Launch Real-Time Multiplayer Match
+  const handleLaunchMultiplayerMatch = (config: {
+    lobby: MultiplayerLobbyState;
+    countdownData: CountdownEventData;
+    isHost: boolean;
+  }) => {
+    setMultiplayerMatchInfo(config);
+    const myId = multiplayerSocket.getPlayerId();
+
+    const opponents: Racer[] = config.countdownData.players.map((p, idx) => ({
+      id: p.id,
+      name: p.name,
+      avatar: p.avatar || '🏎️',
+      isPlayer: p.id === myId,
+      isAi: false,
+      wpm: 0,
+      currentProgress: 0,
+      position: idx + 1,
+      status: 'ready'
+    }));
+
+    setActiveRaceConfig({
+      text: config.countdownData.text,
+      opponents,
+      raceTitle: `Multiplayer Room ${config.lobby.roomId} (Round ${config.lobby.currentRound}/${config.lobby.totalRounds})`,
+      isRanked: true
+    });
+    setCurrentView('racing');
+  };
 
   // Launch Quick Race
   const handleQuickRace = () => {
@@ -209,6 +253,7 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
     wpmHistory: { second: number; wpm: number; errors: number }[];
     totalKeystrokes: number;
     backspaces: number;
+    officialMultiplayerResults?: OfficialMultiplayerResult[];
   }) => {
     const userNetWpm = results.userRacer.netWpm || results.userRacer.wpm || 0;
     const userAcc = results.userRacer.accuracy || 100;
@@ -319,7 +364,8 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
       mistypedKeys: results.mistypedKeys,
       mistypedWords: results.mistypedWords,
       wpmHistory: results.wpmHistory,
-      isNewPersonalBest: isPb
+      isNewPersonalBest: isPb,
+      officialMultiplayerResults: results.officialMultiplayerResults
     });
   };
 
