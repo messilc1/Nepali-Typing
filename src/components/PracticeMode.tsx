@@ -3,6 +3,7 @@ import { BookOpen, CheckCircle2, RotateCcw, Sparkles, Award, Scale, RefreshCw, P
 import { PRACTICE_MODULES, LEGAL_TERMS_PACK } from '../data/wordPacks';
 import { TestSettings, LegalTerm } from '../types';
 import { transliterateWordRuleBased } from '../utils/nepaliTransliteration';
+import { validateStrictKeystroke, getNextExpectedKey } from '../utils/strictTypingEngine';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { NepaliRomanizedKeyboardDiagram } from './NepaliRomanizedKeyboardDiagram';
 
@@ -25,9 +26,25 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
   const [completedCount, setCompletedCount] = useState<number>(0);
   const [mistakesCount, setMistakesCount] = useState<number>(0);
   const [activeItems, setActiveItems] = useState<string[]>([]);
+  const [inputShake, setInputShake] = useState<boolean>(false);
+  const [rejectedKeyInfo, setRejectedKeyInfo] = useState<{ key: string; expected: string } | null>(null);
 
   // Legal Vocabulary filter
   const legalCategories = ['All', 'Constitution', 'Court & Judiciary', 'Civil & Criminal', 'Government & Admin'];
+
+  useEffect(() => {
+    if (inputShake) {
+      const timer = setTimeout(() => setInputShake(false), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [inputShake]);
+
+  useEffect(() => {
+    if (rejectedKeyInfo) {
+      const timer = setTimeout(() => setRejectedKeyInfo(null), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [rejectedKeyInfo]);
 
   useEffect(() => {
     const activeModule = PRACTICE_MODULES.find(m => m.id === selectedModuleId) || PRACTICE_MODULES[0];
@@ -58,59 +75,92 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const currentBuf = settings.language === 'nepali' ? romanBuffer : typedInput;
+
     if (e.key === 'Backspace') {
-      if (romanBuffer.length > 0) {
-        const newBuf = romanBuffer.slice(0, -1);
-        setRomanBuffer(newBuf);
-        setTypedInput(transliterateWordRuleBased(newBuf));
+      if (settings.language === 'nepali') {
+        if (romanBuffer.length > 0) {
+          const newBuf = romanBuffer.slice(0, -1);
+          setRomanBuffer(newBuf);
+          setTypedInput(transliterateWordRuleBased(newBuf));
+        }
       } else {
         setTypedInput(prev => prev.slice(0, -1));
       }
       playKeypressSound(settings.sound, settings.soundVolume);
+      setRejectedKeyInfo(null);
       return;
     }
 
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      if (typedInput.trim() === currentItem) {
-        playKeypressSound(settings.sound, settings.soundVolume);
+      const validation = validateStrictKeystroke({
+        targetWord: currentItem,
+        currentBuffer: currentBuf,
+        currentConverted: typedInput,
+        pressedKey: ' ',
+        language: settings.language,
+        isLastWord: false
+      });
+
+      if (!validation.isValid) {
+        playErrorSound(settings.soundVolume);
+        setMistakesCount(prev => prev + 1);
+        setInputShake(true);
+        setRejectedKeyInfo({
+          key: 'Space',
+          expected: validation.expectedKey === ' ' ? 'Space' : validation.expectedKey
+        });
+        return;
+      }
+
+      playKeypressSound(settings.sound, settings.soundVolume);
+      setCompletedCount(prev => prev + 1);
+      const nextIdx = (currentIndex + 1) % activeItems.length;
+      setCurrentIndex(nextIdx);
+      setTypedInput('');
+      setRomanBuffer('');
+      setRejectedKeyInfo(null);
+      return;
+    }
+
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+      const validation = validateStrictKeystroke({
+        targetWord: currentItem,
+        currentBuffer: currentBuf,
+        currentConverted: typedInput,
+        pressedKey: e.key,
+        language: settings.language,
+        isLastWord: false
+      });
+
+      if (!validation.isValid) {
+        playErrorSound(settings.soundVolume);
+        setMistakesCount(prev => prev + 1);
+        setInputShake(true);
+        setRejectedKeyInfo({
+          key: e.key,
+          expected: validation.expectedKey === ' ' ? 'Space' : validation.expectedKey
+        });
+        return;
+      }
+
+      playKeypressSound(settings.sound, settings.soundVolume);
+      setRejectedKeyInfo(null);
+
+      if (settings.language === 'nepali') {
+        setRomanBuffer(validation.newBuffer);
+        setTypedInput(validation.newConverted);
+      } else {
+        setTypedInput(validation.newBuffer);
+      }
+
+      if (validation.isWordComplete || validation.newConverted === currentItem) {
         setCompletedCount(prev => prev + 1);
         const nextIdx = (currentIndex + 1) % activeItems.length;
         setCurrentIndex(nextIdx);
         setTypedInput('');
         setRomanBuffer('');
-      } else {
-        playErrorSound(settings.soundVolume);
-        setMistakesCount(prev => prev + 1);
-      }
-      return;
-    }
-
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-      playKeypressSound(settings.sound, settings.soundVolume);
-      if (settings.language === 'nepali') {
-        const newBuf = romanBuffer + e.key;
-        setRomanBuffer(newBuf);
-        const converted = transliterateWordRuleBased(newBuf);
-        setTypedInput(converted);
-        
-        // Auto match check
-        if (converted === currentItem) {
-          setCompletedCount(prev => prev + 1);
-          const nextIdx = (currentIndex + 1) % activeItems.length;
-          setCurrentIndex(nextIdx);
-          setTypedInput('');
-          setRomanBuffer('');
-        }
-      } else {
-        const newTyped = typedInput + e.key;
-        setTypedInput(newTyped);
-        if (newTyped === currentItem) {
-          setCompletedCount(prev => prev + 1);
-          const nextIdx = (currentIndex + 1) % activeItems.length;
-          setCurrentIndex(nextIdx);
-          setTypedInput('');
-        }
       }
     }
   };
@@ -191,7 +241,22 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       </div>
 
       {/* Interactive Drill Practice Card */}
-      <div className="bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-3xl border-2 border-blue-200 dark:border-blue-900/60 shadow-lg text-center flex flex-col items-center justify-center relative overflow-hidden">
+      <div className={`bg-white dark:bg-slate-800 p-8 sm:p-12 rounded-3xl border-2 transition-all shadow-lg text-center flex flex-col items-center justify-center relative overflow-hidden ${
+        inputShake
+          ? 'border-rose-500 ring-4 ring-rose-500/20'
+          : 'border-blue-200 dark:border-blue-900/60'
+      }`}>
+        {/* Floating Rejected Key Notification */}
+        {rejectedKeyInfo && (
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/90 px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 shadow-md animate-bounce">
+            <span>Rejected: <strong className="font-mono text-rose-950 dark:text-rose-100 uppercase">{rejectedKeyInfo.key}</strong></span>
+            <span className="text-slate-400 dark:text-slate-600">|</span>
+            <span>Expected:</span>
+            <kbd className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase shadow-xs">
+              {rejectedKeyInfo.expected}
+            </kbd>
+          </div>
+        )}
         
         <div className="flex items-center justify-between w-full max-w-md mb-2">
           <div className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { TestSettings, TestResult, KeyStats, LiveStats, SessionStatus, DetailedWordError, DetailedCharError } from '../types';
 import { transliterateWordRuleBased, getWordSuggestions, getRomanizedHintForWord } from '../utils/nepaliTransliteration';
+import { validateStrictKeystroke, getNextExpectedKey } from '../utils/strictTypingEngine';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
 
@@ -68,6 +69,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const [keystrokes, setKeystrokes] = useState<number>(0);
   const [mistakesCount, setMistakesCount] = useState<number>(0);
   const [backspacesCount, setBackspacesCount] = useState<number>(0);
+  const [inputShake, setInputShake] = useState<boolean>(false);
+  const [rejectedKeyInfo, setRejectedKeyInfo] = useState<{ key: string; expected: string } | null>(null);
 
   // Sync Refs to avoid stale closures in interval & callbacks
   const typedInputRef = useRef<string>('');
@@ -510,6 +513,25 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     onTestComplete(resultObj);
   }, [targetText, targetWords, settings, passageTitle, elapsedSeconds, onTestComplete]);
 
+  // Auto-clear error shake and rejected key feedback
+  useEffect(() => {
+    if (inputShake) {
+      const timer = setTimeout(() => {
+        setInputShake(false);
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [inputShake]);
+
+  useEffect(() => {
+    if (rejectedKeyInfo) {
+      const timer = setTimeout(() => {
+        setRejectedKeyInfo(null);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [rejectedKeyInfo]);
+
   // Clean, responsive Timer logic (Independent of keystroke updates)
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -557,7 +579,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     onRestartTest();
   }, [emitLiveSession, resetState, onRestartTest]);
 
-  // Handle Keystrokes & Romanized Conversion
+  // Handle Keystrokes with Strict Character-by-Character Validation Engine
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isTestFinishedRef.current) return;
 
@@ -573,9 +595,51 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       return;
     }
 
-    // Start timer & session on FIRST valid keystroke
+    const currentTargetWord = targetWords[currentWordIndex] || '';
+    const isLastWord = currentWordIndex === targetWords.length - 1;
+    const currentBuf = settings.language === 'nepali' ? romanBuffer : typedInput;
+
+    const now = Date.now();
+    const latency = lastKeyTimeRef.current ? now - lastKeyTimeRef.current : 50;
+    lastKeyTimeRef.current = now;
+
+    // Handle Backspace
+    if (e.key === 'Backspace') {
+      setBackspacesCount(prev => {
+        const next = prev + 1;
+        backspacesCountRef.current = next;
+        return next;
+      });
+      playKeypressSound(settings.sound, settings.soundVolume);
+      setRejectedKeyInfo(null);
+
+      if (settings.language === 'nepali') {
+        if (romanBuffer.length > 0) {
+          const newBuf = romanBuffer.slice(0, -1);
+          setRomanBuffer(newBuf);
+          const converted = transliterateWordRuleBased(newBuf);
+          setTypedInput(converted);
+          typedInputRef.current = converted;
+          setActiveSuggestions(getWordSuggestions(newBuf));
+          const nextExp = getNextExpectedKey(currentTargetWord, newBuf, settings.language, converted);
+          onNextHintKeyChange?.(nextExp);
+        }
+      } else {
+        if (typedInput.length > 0) {
+          const newTyped = typedInput.slice(0, -1);
+          setTypedInput(newTyped);
+          typedInputRef.current = newTyped;
+          const nextExp = getNextExpectedKey(currentTargetWord, newTyped, settings.language, newTyped);
+          onNextHintKeyChange?.(nextExp);
+        }
+      }
+
+      onLiveStatsChange?.(computeLiveStats());
+      return;
+    }
+
+    // Start timer & session on FIRST keypress attempt
     if (!isTestRunningRef.current) {
-      const now = Date.now();
       isTestRunningRef.current = true;
       setIsTestRunning(true);
       startTimeRef.current = now;
@@ -586,100 +650,55 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       emitLiveSession('Abandoned');
     }
 
-    // Sound feedback
-    const now = Date.now();
-    const latency = lastKeyTimeRef.current ? now - lastKeyTimeRef.current : 50;
-    lastKeyTimeRef.current = now;
-
-    if (e.key === 'Backspace') {
-      setBackspacesCount(prev => {
-        const next = prev + 1;
-        backspacesCountRef.current = next;
-        return next;
-      });
-      playKeypressSound(settings.sound, settings.soundVolume);
-
-      if (settings.language === 'nepali') {
-        if (romanBuffer.length > 0) {
-          const newBuf = romanBuffer.slice(0, -1);
-          setRomanBuffer(newBuf);
-          const converted = transliterateWordRuleBased(newBuf);
-          setTypedInput(converted);
-          typedInputRef.current = converted;
-          setActiveSuggestions(getWordSuggestions(newBuf));
-        } else if (typedInput.length > 0) {
-          const newTyped = typedInput.slice(0, -1);
-          setTypedInput(newTyped);
-          typedInputRef.current = newTyped;
-        } else if (currentWordIndex > 0) {
-          // Move back to previous word
-          const prevIdx = currentWordIndex - 1;
-          setCurrentWordIndex(prevIdx);
-          currentWordIndexRef.current = prevIdx;
-
-          const prevTyped = typedHistory[prevIdx] || '';
-          setTypedInput(prevTyped);
-          typedInputRef.current = prevTyped;
-
-          setTypedHistory(prev => {
-            const next = prev.slice(0, -1);
-            typedHistoryRef.current = next;
-            return next;
-          });
-        }
-      } else {
-        if (typedInput.length > 0) {
-          const newTyped = typedInput.slice(0, -1);
-          setTypedInput(newTyped);
-          typedInputRef.current = newTyped;
-        } else if (currentWordIndex > 0) {
-          const prevIdx = currentWordIndex - 1;
-          setCurrentWordIndex(prevIdx);
-          currentWordIndexRef.current = prevIdx;
-
-          const prevTyped = typedHistory[prevIdx] || '';
-          setTypedInput(prevTyped);
-          typedInputRef.current = prevTyped;
-
-          setTypedHistory(prev => {
-            const next = prev.slice(0, -1);
-            typedHistoryRef.current = next;
-            return next;
-          });
-        }
-      }
-
-      onLiveStatsChange?.(computeLiveStats());
-      return;
-    }
-
-    // Handle space key -> word commit
+    // Handle Space Key -> Word Commit
     if (e.key === ' ' || e.code === 'Space') {
       e.preventDefault();
-      if (!typedInput.trim() && !romanBuffer) return;
 
-      const currentTargetWord = targetWords[currentWordIndex] || '';
-      const finalWord = typedInput;
+      const validation = validateStrictKeystroke({
+        targetWord: currentTargetWord,
+        currentBuffer: currentBuf,
+        currentConverted: typedInput,
+        pressedKey: ' ',
+        language: settings.language,
+        isLastWord
+      });
 
-      // Track accuracy and mistakes
-      if (finalWord !== currentTargetWord) {
+      if (!validation.isValid) {
+        // Space REJECTED: User must finish typing the current word correctly first!
+        playErrorSound(settings.soundVolume);
         setMistakesCount(prev => {
           const next = prev + 1;
           mistakesCountRef.current = next;
           return next;
         });
-        playErrorSound(settings.soundVolume);
+        setKeystrokes(prev => prev + 1);
+        setInputShake(true);
+        setRejectedKeyInfo({
+          key: 'Space',
+          expected: validation.expectedKey === ' ' ? 'Space' : validation.expectedKey
+        });
+
+        mistypedCharsRef.current[' '] = (mistypedCharsRef.current[' '] || 0) + 1;
         mistypedWordsRef.current[currentTargetWord] = (mistypedWordsRef.current[currentTargetWord] || 0) + 1;
-      } else {
-        playKeypressSound(settings.sound, settings.soundVolume);
+        charErrorsListRef.current.push({
+          char: validation.expectedKey || ' ',
+          typedChar: ' ',
+          count: 1,
+          timestamp: Date.now()
+        });
+
+        onKeypressMetric('space', false, latency);
+        onLiveStatsChange?.(computeLiveStats());
+        return;
       }
 
-      // Record key metrics
-      const keyKey = e.key.toLowerCase();
-      onKeypressMetric(keyKey, finalWord === currentTargetWord, latency);
+      // Space ACCEPTED: Current word is completely matched -> advance to next word!
+      playKeypressSound(settings.sound, settings.soundVolume);
+      setKeystrokes(prev => prev + 1);
+      setRejectedKeyInfo(null);
+      onKeypressMetric('space', true, latency);
 
-      // Commit word
-      const nextHistory = [...typedHistory, finalWord];
+      const nextHistory = [...typedHistory, currentTargetWord];
       typedHistoryRef.current = nextHistory;
       setTypedHistory(nextHistory);
 
@@ -695,7 +714,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       onLiveStatsChange?.(computeLiveStats());
       emitLiveSession('Abandoned');
 
-      // Check for Word count completion or end of passage
+      // Check test completion for words mode or end of passage
       if (
         (settings.testType === 'words' && nextWordIdx >= settings.wordCount) ||
         nextWordIdx >= targetWords.length
@@ -705,37 +724,68 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       return;
     }
 
-    // Regular keypress
+    // Handle Regular Keypress
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      setKeystrokes(prev => prev + 1);
-      playKeypressSound(settings.sound, settings.soundVolume);
+      const validation = validateStrictKeystroke({
+        targetWord: currentTargetWord,
+        currentBuffer: currentBuf,
+        currentConverted: typedInput,
+        pressedKey: e.key,
+        language: settings.language,
+        isLastWord
+      });
 
-      let currentConvertedOrTyped = '';
-      if (settings.language === 'nepali') {
-        const newBuf = romanBuffer + e.key;
-        setRomanBuffer(newBuf);
-        const converted = transliterateWordRuleBased(newBuf);
-        setTypedInput(converted);
-        typedInputRef.current = converted;
-        currentConvertedOrTyped = converted;
-        setActiveSuggestions(getWordSuggestions(newBuf));
-      } else {
-        const newTyped = typedInput + e.key;
-        setTypedInput(newTyped);
-        typedInputRef.current = newTyped;
-        currentConvertedOrTyped = newTyped;
+      if (!validation.isValid) {
+        // Character REJECTED: Do NOT insert into typed text, do NOT advance cursor!
+        playErrorSound(settings.soundVolume);
+        setMistakesCount(prev => {
+          const next = prev + 1;
+          mistakesCountRef.current = next;
+          return next;
+        });
+        setKeystrokes(prev => prev + 1);
+        setInputShake(true);
+        setRejectedKeyInfo({
+          key: e.key,
+          expected: validation.expectedKey === ' ' ? 'Space' : validation.expectedKey
+        });
+
+        mistypedCharsRef.current[e.key] = (mistypedCharsRef.current[e.key] || 0) + 1;
+        mistypedWordsRef.current[currentTargetWord] = (mistypedWordsRef.current[currentTargetWord] || 0) + 1;
+        charErrorsListRef.current.push({
+          char: validation.expectedKey || e.key,
+          typedChar: e.key,
+          count: 1,
+          timestamp: Date.now()
+        });
+
+        onKeypressMetric(e.key.toLowerCase(), false, latency);
+        onLiveStatsChange?.(computeLiveStats());
+        return;
       }
 
+      // Character ACCEPTED: Valid input according to Romanized Nepali / English rules!
+      playKeypressSound(settings.sound, settings.soundVolume);
+      setKeystrokes(prev => prev + 1);
+      setRejectedKeyInfo(null);
+
+      if (settings.language === 'nepali') {
+        setRomanBuffer(validation.newBuffer);
+        setTypedInput(validation.newConverted);
+        typedInputRef.current = validation.newConverted;
+        setActiveSuggestions(getWordSuggestions(validation.newBuffer));
+      } else {
+        setTypedInput(validation.newBuffer);
+        typedInputRef.current = validation.newBuffer;
+      }
+
+      onKeypressMetric(e.key.toLowerCase(), true, latency);
       onLiveStatsChange?.(computeLiveStats());
       emitLiveSession('Abandoned');
 
-      // Check auto-completion on last character of last word for untimed/paragraph tests
-      const currentTargetWord = targetWords[currentWordIndex] || '';
-      const isLastWord = currentWordIndex === targetWords.length - 1;
-
-      if (isLastWord && currentTargetWord && (currentConvertedOrTyped === currentTargetWord || currentConvertedOrTyped.length >= currentTargetWord.length)) {
-        // Commit final word immediately
-        const nextHistory = [...typedHistory, currentConvertedOrTyped];
+      // Auto-complete if last word of the test is complete
+      if (isLastWord && validation.isWordComplete) {
+        const nextHistory = [...typedHistory, currentTargetWord];
         typedHistoryRef.current = nextHistory;
         setTypedHistory(nextHistory);
 
@@ -945,8 +995,24 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       <div
         ref={containerRef}
         onClick={() => inputRef.current?.focus()}
-        className="relative w-full min-h-[220px] max-h-[400px] bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border-2 border-slate-200/80 dark:border-slate-800 shadow-lg hover:border-blue-300 dark:hover:border-blue-800 transition-all cursor-text overflow-hidden select-none flex flex-col justify-between"
+        className={`relative w-full min-h-[220px] max-h-[400px] bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border-2 transition-all cursor-text overflow-hidden select-none flex flex-col justify-between ${
+          inputShake
+            ? 'border-rose-500 ring-4 ring-rose-500/20 shadow-rose-500/10'
+            : 'border-slate-200/80 dark:border-slate-800 shadow-lg hover:border-blue-300 dark:hover:border-blue-800'
+        }`}
       >
+        {/* Floating Rejected Key Notification */}
+        {rejectedKeyInfo && (
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/90 px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 shadow-md animate-bounce">
+            <span>Rejected: <strong className="font-mono text-rose-950 dark:text-rose-100 uppercase">{rejectedKeyInfo.key}</strong></span>
+            <span className="text-slate-400 dark:text-slate-600">|</span>
+            <span>Expected:</span>
+            <kbd className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase shadow-xs">
+              {rejectedKeyInfo.expected}
+            </kbd>
+          </div>
+        )}
+
         {/* Hidden Input field capturing keystrokes */}
         <input
           ref={inputRef}

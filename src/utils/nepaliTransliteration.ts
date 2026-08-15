@@ -4,7 +4,7 @@
  */
 
 // Dictionary for high-accuracy standard words & legal/constitutional vocabulary
-const COMMON_DICTIONARY: Record<string, string> = {
+export const COMMON_DICTIONARY: Record<string, string> = {
   // Greetings & Pronouns
   namaste: 'नमस्ते',
   namaskar: 'नमस्कार',
@@ -292,12 +292,31 @@ const NUMBERS: Record<string, string> = {
 export function transliterateWordRuleBased(roman: string): string {
   if (!roman) return '';
 
-  const clean = roman.trim().toLowerCase();
-  if (COMMON_DICTIONARY[clean]) {
-    return COMMON_DICTIONARY[clean];
+  // Extract leading and trailing punctuation
+  const prefixMatch = roman.match(/^[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+/);
+  const leadingPunct = prefixMatch ? prefixMatch[0] : '';
+  const suffixMatch = roman.match(/[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+$/);
+  const trailingPunct = suffixMatch ? suffixMatch[0] : '';
+
+  const core = roman.substring(
+    leadingPunct.length,
+    roman.length - (trailingPunct ? trailingPunct.length : 0)
+  ).trim();
+
+  const convertPunct = (p: string) => {
+    return p.replace(/\./g, '।').replace(/\|/g, '।');
+  };
+
+  if (!core) {
+    return convertPunct(roman);
   }
-  if (COMMON_DICTIONARY[roman]) {
-    return COMMON_DICTIONARY[roman];
+
+  const clean = core.toLowerCase();
+  if (COMMON_DICTIONARY[clean]) {
+    return convertPunct(leadingPunct) + COMMON_DICTIONARY[clean] + convertPunct(trailingPunct);
+  }
+  if (COMMON_DICTIONARY[core]) {
+    return convertPunct(leadingPunct) + COMMON_DICTIONARY[core] + convertPunct(trailingPunct);
   }
 
   let result = '';
@@ -320,6 +339,8 @@ export function transliterateWordRuleBased(roman: string): string {
         result += 'ँ';
       } else if (char === ':') {
         result += 'ः';
+      } else if (char === '.' || char === '|') {
+        result += '।';
       } else {
         result += char;
       }
@@ -468,14 +489,14 @@ export function getWordSuggestions(romanWord: string): string[] {
 }
 
 // Build reverse dictionary for fast 100% accurate lookups
-const REVERSE_DICTIONARY: Record<string, string> = {};
+export const REVERSE_DICTIONARY: Record<string, string> = {};
 Object.entries(COMMON_DICTIONARY).forEach(([roman, devanagari]) => {
   if (!REVERSE_DICTIONARY[devanagari]) {
     REVERSE_DICTIONARY[devanagari] = roman;
   }
 });
 
-const DEVANAGARI_CONSONANTS: Record<string, string> = {
+export const DEVANAGARI_CONSONANTS: Record<string, string> = {
   'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'ng',
   'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'yn',
   'ट': 'T', 'ठ': 'Th', 'ड': 'D', 'ढ': 'Dh', 'ण': 'N',
@@ -485,12 +506,12 @@ const DEVANAGARI_CONSONANTS: Record<string, string> = {
   'क्ष': 'ksh', 'त्र': 'tr', 'ज्ञ': 'gy', 'श्र': 'shr'
 };
 
-const DEVANAGARI_INDEPENDENT_VOWELS: Record<string, string> = {
+export const DEVANAGARI_INDEPENDENT_VOWELS: Record<string, string> = {
   'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'ऋ': 'ri', 'अं': 'am', 'अः': 'ah'
 };
 
-const DEVANAGARI_VOWEL_MATRAS: Record<string, string> = {
-  'ा': 'a', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ृ': 'ri', 'ँ': '~', 'ं': 'm', 'ः': ':'
+export const DEVANAGARI_VOWEL_MATRAS: Record<string, string> = {
+  'ा': 'aa', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ृ': 'ri', 'ँ': '~', 'ं': 'm', 'ः': ':'
 };
 
 /**
@@ -499,88 +520,100 @@ const DEVANAGARI_VOWEL_MATRAS: Record<string, string> = {
 export function getRomanizedHintForWord(word: string): string {
   if (!word) return '';
 
-  // Clean word of surrounding punctuation
-  const clean = word.replace(/[।,\.!\?:;"'\(\)\[\]\{\}]/g, '').trim();
-  if (!clean) return word;
+  // Extract leading and trailing punctuation
+  const prefixMatch = word.match(/^[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+/);
+  const leadingPunct = prefixMatch ? prefixMatch[0] : '';
+  const suffixMatch = word.match(/[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+$/);
+  const trailingPunct = suffixMatch ? suffixMatch[0] : '';
 
-  // If already English text, return as-is lowercase
-  if (/^[a-zA-Z0-9]+$/.test(clean)) {
-    return clean.toLowerCase();
+  const clean = word.substring(
+    leadingPunct.length,
+    word.length - (trailingPunct ? trailingPunct.length : 0)
+  ).trim();
+
+  // If already English text, return as-is lowercase with punctuation
+  if (!clean || /^[a-zA-Z0-9]+$/.test(clean)) {
+    return leadingPunct + (clean ? clean.toLowerCase() : '') + (trailingPunct === '।' ? '.' : trailingPunct);
   }
 
   // Check reverse dictionary first
+  let coreResult = '';
   if (REVERSE_DICTIONARY[clean]) {
-    return REVERSE_DICTIONARY[clean];
-  }
+    coreResult = REVERSE_DICTIONARY[clean];
+  } else {
+    let result = '';
+    let i = 0;
+    const n = clean.length;
 
-  let result = '';
-  let i = 0;
-  const n = clean.length;
+    while (i < n) {
+      const char = clean[i];
 
-  while (i < n) {
-    const char = clean[i];
+      // Numbers
+      if (/[०-९]/.test(char)) {
+        const numMap: Record<string, string> = { '०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9' };
+        result += numMap[char] || char;
+        i++;
+        continue;
+      }
 
-    // Numbers
-    if (/[०-९]/.test(char)) {
-      const numMap: Record<string, string> = { '०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9' };
-      result += numMap[char] || char;
-      i++;
-      continue;
-    }
+      // Check for 2-char conjuncts
+      const twoChar = clean.substring(i, i + 2);
+      let matchedConsonant: string | null = null;
+      let matchedLen = 0;
 
-    // Check for 2-char conjuncts
-    const twoChar = clean.substring(i, i + 2);
-    let matchedConsonant: string | null = null;
-    let matchedLen = 0;
+      if (DEVANAGARI_CONSONANTS[twoChar]) {
+        matchedConsonant = DEVANAGARI_CONSONANTS[twoChar];
+        matchedLen = 2;
+      } else if (DEVANAGARI_CONSONANTS[char]) {
+        matchedConsonant = DEVANAGARI_CONSONANTS[char];
+        matchedLen = 1;
+      }
 
-    if (DEVANAGARI_CONSONANTS[twoChar]) {
-      matchedConsonant = DEVANAGARI_CONSONANTS[twoChar];
-      matchedLen = 2;
-    } else if (DEVANAGARI_CONSONANTS[char]) {
-      matchedConsonant = DEVANAGARI_CONSONANTS[char];
-      matchedLen = 1;
-    }
+      if (matchedConsonant) {
+        result += matchedConsonant;
+        i += matchedLen;
 
-    if (matchedConsonant) {
-      result += matchedConsonant;
-      i += matchedLen;
-
-      if (i < n) {
-        const nextChar = clean[i];
-        if (nextChar === '्') {
-          // Halant: explicit no vowel following consonant
-          i++;
-        } else if (DEVANAGARI_VOWEL_MATRAS[nextChar]) {
-          result += DEVANAGARI_VOWEL_MATRAS[nextChar];
-          i++;
-        } else {
-          // Inherent 'a' vowel if followed by another consonant or end of word
-          if (i < n && !/[।,\.\s]/.test(nextChar)) {
-            result += 'a';
+        if (i < n) {
+          const nextChar = clean[i];
+          if (nextChar === '्') {
+            // Halant: explicit no vowel following consonant
+            i++;
+          } else if (DEVANAGARI_VOWEL_MATRAS[nextChar]) {
+            result += DEVANAGARI_VOWEL_MATRAS[nextChar];
+            i++;
+          } else {
+            // Inherent 'a' vowel if followed by another consonant or end of word
+            if (i < n && !/[।,\.\s]/.test(nextChar)) {
+              result += 'a';
+            }
           }
         }
+        continue;
       }
-      continue;
-    }
 
-    // Independent Vowels
-    if (DEVANAGARI_INDEPENDENT_VOWELS[char]) {
-      result += DEVANAGARI_INDEPENDENT_VOWELS[char];
+      // Independent Vowels
+      if (DEVANAGARI_INDEPENDENT_VOWELS[char]) {
+        result += DEVANAGARI_INDEPENDENT_VOWELS[char];
+        i++;
+        continue;
+      }
+
+      // Matra
+      if (DEVANAGARI_VOWEL_MATRAS[char]) {
+        result += DEVANAGARI_VOWEL_MATRAS[char];
+        i++;
+        continue;
+      }
+
+      result += char;
       i++;
-      continue;
     }
-
-    // Matra
-    if (DEVANAGARI_VOWEL_MATRAS[char]) {
-      result += DEVANAGARI_VOWEL_MATRAS[char];
-      i++;
-      continue;
-    }
-
-    result += char;
-    i++;
+    coreResult = result;
   }
 
-  return result.toLowerCase();
+  const convertedTrailingPunct = trailingPunct === '।' ? '.' : trailingPunct;
+  const convertedLeadingPunct = leadingPunct === '।' ? '.' : leadingPunct;
+
+  return convertedLeadingPunct + coreResult + convertedTrailingPunct;
 }
 
