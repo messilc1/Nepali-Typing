@@ -22,6 +22,7 @@ interface ResultModalProps {
   onRetry: () => void;
   onNewTest: () => void;
   onLaunchTargetedPractice: (weakChars: string[]) => void;
+  onNavigateToImprovement?: () => void;
   isPersonalBest: boolean;
 }
 
@@ -30,6 +31,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({
   onRetry,
   onNewTest,
   onLaunchTargetedPractice,
+  onNavigateToImprovement,
   isPersonalBest
 }) => {
   // Fire confetti if personal best!
@@ -305,15 +307,27 @@ https://nepalitypingpro.app
             </p>
           </div>
 
-          {weakCharacters.length > 0 && (
-            <button
-              onClick={() => onLaunchTargetedPractice(weakCharacters)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all mt-2"
-            >
-              <span>Practice Weak Characters ({weakCharacters.slice(0, 4).join(', ')})</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
+          <div className="flex flex-col sm:flex-row gap-2 mt-3">
+            {weakCharacters.length > 0 && (
+              <button
+                onClick={() => onLaunchTargetedPractice(weakCharacters)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+              >
+                <span>Practice Weak Characters ({weakCharacters.slice(0, 3).join(', ')})</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+
+            {onNavigateToImprovement && (
+              <button
+                onClick={onNavigateToImprovement}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer"
+              >
+                <Zap className="w-4 h-4 fill-slate-950" />
+                <span>Improve My Typing (AI Coach)</span>
+              </button>
+            )}
+          </div>
         </div>
 
       </div>

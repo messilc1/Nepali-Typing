@@ -16,7 +16,7 @@ export interface LiveStats {
   consistency: number;
 }
 
-export type NavigationTab = 'test' | 'practice' | 'legal' | 'analytics' | 'certification' | 'about';
+export type NavigationTab = 'test' | 'practice' | 'improvement' | 'legal' | 'analytics' | 'certification' | 'about';
 
 export type LanguageMode = 'nepali' | 'english';
 
@@ -207,3 +207,60 @@ export interface AchievementBadge {
   unlocked: boolean;
   unlockedAt?: string;
 }
+
+export interface WeakKeyAnalysis {
+  key: string; // e.g. 'ny', 'N', 'tr', 'r'
+  devanagari: string; // e.g. 'न्य', 'ण', 'त्र', 'र'
+  romanizedSequence: string; // e.g. 'ny', 'N', 'tr', 'r'
+  mistakesCount: number;
+  totalHits: number;
+  accuracy: number; // 0 - 100
+  avgLatencyMs: number;
+  errorWeight: number; // calculated priority score
+  sampleWords: string[];
+  category: 'conjunct' | 'half-letter' | 'consonant' | 'vowel' | 'matra' | 'legal-specific' | 'general';
+}
+
+export interface WeakWordRecord {
+  word: string;
+  romanized: string;
+  timesTyped: number;
+  mistakesCount: number;
+  accuracy: number;
+  avgTimeMs: number;
+  correctionsCount: number;
+  lastMistakeDate: number;
+  improvementPercent: number;
+  category?: string;
+}
+
+export type PracticeLevel = 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface GeneratedExercise {
+  level: PracticeLevel;
+  levelTitle: string;
+  levelDescription: string;
+  targetKeys: string[];
+  targetSequences: string[];
+  targetDevanagari: string[];
+  items: string[];
+  fullText: string;
+  recommendedAccuracy: number;
+  isLegalFocus?: boolean;
+}
+
+export interface DailyImprovementChallenge {
+  date: string;
+  focusKey: string;
+  focusDevanagari: string;
+  focusRomanized: string;
+  characterDrills: string[];
+  wordDrills: string[];
+  difficultWords: string[];
+  paragraph: string;
+  isCompleted: boolean;
+  initialAccuracy?: number;
+  finalAccuracy?: number;
+  improvementScore?: number;
+}
+

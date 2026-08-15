@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Keyboard,
   BookOpen,
+  Zap,
   BarChart3,
   Settings,
   Flame,
@@ -202,6 +203,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
+              id="nav-tab-improvement"
+              onClick={() => handleTabClick('improvement')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'improvement'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
+              <span>Improvement</span>
+              <span className="text-[10px] bg-amber-400/20 text-amber-600 dark:text-amber-300 font-extrabold px-1.5 py-0.2 rounded whitespace-nowrap">
+                AI Coach
+              </span>
+            </button>
+
+            <button
               id="nav-tab-legal"
               onClick={() => handleTabClick('legal')}
               className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
@@ -262,7 +279,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Mobile Dropdown Navigation Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden py-3 border-t border-slate-200 dark:border-slate-800 space-y-2 animate-fadeIn w-full">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <button
                 onClick={() => handleTabClick('test')}
                 className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
@@ -285,6 +302,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <BookOpen className="w-4 h-4 text-blue-500" />
                 <span>Practice Mode</span>
+              </button>
+
+              <button
+                onClick={() => handleTabClick('improvement')}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeTab === 'improvement'
+                    ? 'bg-blue-600 text-white border-blue-600 font-extrabold'
+                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <span>Improvement</span>
               </button>
 
               <button

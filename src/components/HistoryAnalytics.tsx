@@ -36,13 +36,15 @@ interface HistoryAnalyticsProps {
   keyStatsMap?: Record<string, KeyStats>;
   onClearHistory: () => void;
   onStartTargetedPractice?: (items: string[]) => void;
+  onNavigateToImprovement?: () => void;
 }
 
 export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
   userStats,
   keyStatsMap = {},
   onClearHistory,
-  onStartTargetedPractice = (_items?: string[]) => {}
+  onStartTargetedPractice = (_items?: string[]) => {},
+  onNavigateToImprovement
 }) => {
   // Primary Analytics Section Switcher ('current' vs 'lifetime')
   const [primarySection, setPrimarySection] = useState<'current' | 'lifetime'>('current');
@@ -361,6 +363,16 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {onNavigateToImprovement && (
+              <button
+                onClick={onNavigateToImprovement}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer"
+              >
+                <Zap className="w-4 h-4 fill-slate-950" />
+                <span>Improve My Typing (AI Coach)</span>
+              </button>
+            )}
+
             <button
               onClick={exportCSV}
               disabled={history.length === 0}

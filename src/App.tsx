@@ -8,6 +8,7 @@ import { ErrorAnalysisView } from './components/ErrorAnalysisView';
 import { PracticeMode } from './components/PracticeMode';
 import { LegalPackView } from './components/LegalPackView';
 import { HistoryAnalytics } from './components/HistoryAnalytics';
+import { TypingImprovementView } from './components/TypingImprovementView';
 import { CertificationView } from './components/CertificationView';
 import { AboutView } from './components/AboutView';
 import { SettingsModal } from './components/SettingsModal';
@@ -81,11 +82,11 @@ export default function App() {
   const [activeTab, setActiveTabState] = useState<NavigationTab>(() => {
     try {
       const hash = window.location.hash.replace('#', '');
-      if (['test', 'practice', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+      if (['test', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
         return hash as NavigationTab;
       }
       const saved = localStorage.getItem('nepali_typing_active_tab');
-      if (saved && ['test', 'practice', 'legal', 'analytics', 'certification', 'about'].includes(saved)) {
+      if (saved && ['test', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(saved)) {
         return saved as NavigationTab;
       }
     } catch {}
@@ -106,7 +107,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['test', 'practice', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+      if (['test', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
         setActiveTabState(hash as NavigationTab);
       }
     };
@@ -405,6 +406,7 @@ export default function App() {
                   setTargetText(generateTargetText());
                 }}
                 onLaunchTargetedPractice={handleLaunchTargetedPractice}
+                onNavigateToImprovement={() => setActiveTab('improvement')}
                 isPersonalBest={isPersonalBest}
               />
             ) : (
@@ -456,12 +458,26 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'improvement' && (
+          <TypingImprovementView
+            userStats={userStats}
+            keyStatsMap={keyStatsMap}
+            settings={settings}
+            onLaunchFullPractice={(items, title) => {
+              handleLaunchTargetedPractice(items);
+              if (title) setActivePassageTitle(title);
+            }}
+            onNavigateToAnalytics={() => setActiveTab('analytics')}
+          />
+        )}
+
         {(activeTab === 'analytics' || (activeTab as string) === 'history' || (activeTab as string) === 'heatmap') && (
           <HistoryAnalytics
             userStats={userStats}
             keyStatsMap={keyStatsMap}
             onStartTargetedPractice={handleLaunchTargetedPractice}
             onClearHistory={handleClearHistory}
+            onNavigateToImprovement={() => setActiveTab('improvement')}
           />
         )}
 
@@ -514,6 +530,8 @@ export default function App() {
               <button onClick={() => setActiveTab('test')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Typing Test</button>
               <span>&bull;</span>
               <button onClick={() => setActiveTab('practice')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Practice Mode</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('improvement')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Improvement</button>
               <span>&bull;</span>
               <button onClick={() => setActiveTab('legal')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Legal Pack</button>
               <span>&bull;</span>
