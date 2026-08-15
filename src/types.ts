@@ -16,7 +16,7 @@ export interface LiveStats {
   consistency: number;
 }
 
-export type NavigationTab = 'test' | 'practice' | 'improvement' | 'legal' | 'analytics' | 'certification' | 'about';
+export type NavigationTab = 'test' | 'english' | 'practice' | 'improvement' | 'legal' | 'analytics' | 'certification' | 'about';
 
 export type LanguageMode = 'nepali' | 'english';
 
@@ -112,12 +112,22 @@ export interface DetailedWordError {
   corrected: boolean;
   timeSpentMs?: number;
   backspacesUsed?: number;
+  correctionMethod?: 'Backspace' | 'None';
+  correctionTimeMs?: number;
+  errorPosition?: number;
+  timestamp?: number;
 }
 
 export interface DetailedCharError {
   targetChar: string;
   typedChar: string;
   frequency: number;
+  targetWord?: string;
+  position?: number;
+  corrected?: boolean;
+  correctionMethod?: 'Backspace' | 'None';
+  correctionTimeMs?: number;
+  timestamp?: number;
 }
 
 export type SessionStatus = 'Completed' | 'Timed Out' | 'Abandoned' | 'Interrupted';
@@ -135,7 +145,11 @@ export interface TestResult {
   remainingSeconds?: number | null;
   grossWpm: number;
   netWpm: number;
-  accuracy: number; // 0 - 100
+  accuracy: number; // 0 - 100 (Final Submitted Text Accuracy)
+  finalAccuracy?: number; // Explicit alias for final submitted accuracy (100% when all words corrected)
+  keystrokeAccuracy?: number; // Raw keystroke accuracy factoring in mistakes before correction
+  correctedMistakesCount?: number; // Mistakes that were corrected with Backspace
+  uncorrectedMistakesCount?: number; // Mistakes left uncorrected
   totalCharactersTyped: number;
   correctCharacters: number;
   wrongCharacters: number;
@@ -263,4 +277,96 @@ export interface DailyImprovementChallenge {
   finalAccuracy?: number;
   improvementScore?: number;
 }
+
+// =========================================================================
+// ENGLISH TYPING ACADEMY & LEARNING SYSTEM TYPES
+// =========================================================================
+
+export type EnglishMilestoneTier =
+  | 'Beginner' // 10 WPM
+  | 'Basic' // 20 WPM
+  | 'Developing' // 30 WPM
+  | 'Intermediate' // 40 WPM
+  | 'Good' // 50 WPM
+  | 'Advanced' // 60 WPM
+  | 'Professional' // 70 WPM
+  | 'Expert'; // 80+ WPM
+
+export interface EnglishLevelExercise {
+  id: string;
+  level: number; // 1 to 7
+  lessonNumber: number;
+  title: string;
+  subtitle: string;
+  description: string;
+  focusKeys: string[];
+  fingerGuidance: string;
+  targetText: string;
+  minAccuracy: number; // 85% to pass, 95%+ to master and unlock next
+  targetWpm: number;
+  mode: 'letters' | 'words' | 'sentences' | 'paragraph' | 'mixed';
+}
+
+export interface EnglishLevelInfo {
+  level: number;
+  title: string;
+  subtitle: string;
+  badge: string;
+  description: string;
+  focusConcept: string;
+  targetWpmRange: string;
+  exercises: EnglishLevelExercise[];
+}
+
+export interface EnglishUserProgress {
+  unlockedLevel: number;
+  unlockedExerciseId: string;
+  completedExercises: Record<string, {
+    wpm: number;
+    accuracy: number;
+    date: string;
+    stars: number; // 1, 2, 3 stars (1: >=80%, 2: >=90%, 3: >=95%)
+    passed: boolean;
+  }>;
+}
+
+export interface EnglishWeakKeyAnalysis {
+  key: string;
+  finger: string;
+  hand: 'Left' | 'Right';
+  mistakesCount: number;
+  totalHits: number;
+  accuracy: number;
+  avgLatencyMs: number;
+  recommendedWords: string[];
+}
+
+export interface EnglishParagraphTest {
+  id: string;
+  title: string;
+  category: 'Business' | 'Technology' | 'Legal' | 'Science & Academic' | 'Literature' | 'General';
+  lengthCategory: 'Short' | 'Medium' | 'Long';
+  wordCount: number;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+  text: string;
+}
+
+export interface EnglishPracticeModule {
+  id: string;
+  title: string;
+  category: 'home-row' | 'all-rows' | 'common-words' | 'sentences' | 'numbers-symbols' | 'technical' | 'legal' | 'custom' | string;
+  description: string;
+  items: string[];
+}
+
+export interface EnglishImprovementDrill {
+  id: string;
+  title: string;
+  stage: 1 | 2 | 3 | 4 | 5;
+  stageName: 'Key Drills' | 'Key Combinations' | 'Target Words' | 'Practice Sentences' | 'Contextual Paragraph';
+  targetKeys: string[];
+  content: string;
+  description: string;
+}
+
 

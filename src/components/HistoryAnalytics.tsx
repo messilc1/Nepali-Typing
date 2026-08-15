@@ -504,7 +504,14 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
 
                   {/* Accuracy */}
                   <div className="bg-white dark:bg-slate-800/90 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
-                    <span className="text-xs font-extrabold uppercase text-slate-400">Accuracy</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold uppercase text-slate-400">Final Accuracy</span>
+                      {currentSession.keystrokeAccuracy !== undefined && currentSession.keystrokeAccuracy !== currentSession.accuracy && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                          Keystroke: {currentSession.keystrokeAccuracy}%
+                        </span>
+                      )}
+                    </div>
                     <div className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
                       {currentSession.accuracy}%
                     </div>
@@ -589,6 +596,7 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
                             <th className="py-3 px-4">Typed Word</th>
                             <th className="py-3 px-4 text-center">Mistakes</th>
                             <th className="py-3 px-4 text-center">Status</th>
+                            <th className="py-3 px-4 text-center">Correction</th>
                             <th className="py-3 px-4 text-center">Time Spent</th>
                             <th className="py-3 px-4 text-center">Backspaces</th>
                           </tr>
@@ -615,6 +623,15 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
                                   <span className="px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-200 font-extrabold text-[11px] inline-flex items-center gap-1">
                                     <X className="w-3 h-3" /> Not Corrected
                                   </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center font-semibold text-slate-700 dark:text-slate-300">
+                                {err.correctionMethod === 'Backspace' || (err.backspacesUsed && err.backspacesUsed > 0) ? (
+                                  <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
+                                    Backspace
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 text-[10px]">—</span>
                                 )}
                               </td>
                               <td className="py-3 px-4 text-center font-mono text-slate-600 dark:text-slate-300">

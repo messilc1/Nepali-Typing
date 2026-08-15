@@ -15,7 +15,8 @@ import {
   Award,
   Info,
   Menu,
-  X
+  X,
+  GraduationCap
 } from 'lucide-react';
 import { NavigationTab, TestSettings, UserStats } from '../types';
 import { FontSelector } from './FontSelector';
@@ -186,7 +187,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Keyboard className="w-4 h-4" />
-              <span>Typing Test</span>
+              <span>Nepali Typing</span>
+            </button>
+
+            <button
+              id="nav-tab-english"
+              onClick={() => handleTabClick('english')}
+              className={`flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'english'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+            >
+              <GraduationCap className="w-4 h-4 text-emerald-500" />
+              <span>English Typing</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded whitespace-nowrap ${
+                activeTab === 'english'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+              }`}>
+                Academy
+              </span>
             </button>
 
             <button
@@ -289,7 +310,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <Keyboard className="w-4 h-4 text-blue-500" />
-                <span>Typing Test</span>
+                <span>Nepali Typing</span>
+              </button>
+
+              <button
+                onClick={() => handleTabClick('english')}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
+                  activeTab === 'english'
+                    ? 'bg-blue-600 text-white border-blue-600 font-extrabold shadow-sm'
+                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                }`}
+              >
+                <GraduationCap className="w-4 h-4 text-emerald-500" />
+                <span>English Typing</span>
               </button>
 
               <button

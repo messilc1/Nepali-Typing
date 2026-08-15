@@ -91,6 +91,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const currentWordMistakesRef = useRef<number>(0);
   const currentWordBackspacesRef = useRef<number>(0);
   const currentWordStartTimeRef = useRef<number | null>(null);
+  const currentWordErrorStartRef = useRef<number | null>(null);
+  const currentWordMistypedSnapshotRef = useRef<string>('');
   const wordErrorsListRef = useRef<DetailedWordError[]>([]);
   const charErrorsListRef = useRef<DetailedCharError[]>([]);
 
@@ -364,6 +366,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     currentWordMistakesRef.current = 0;
     currentWordBackspacesRef.current = 0;
     currentWordStartTimeRef.current = null;
+    currentWordErrorStartRef.current = null;
+    currentWordMistypedSnapshotRef.current = '';
     wordErrorsListRef.current = [];
     charErrorsListRef.current = [];
 
@@ -438,11 +442,40 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       }
     });
 
+    // If the active word being typed had mistakes and wasn't committed with space yet:
+    if (currentWordMistakesRef.current > 0) {
+      const activeWord = targetWords[curWordIdx] || '';
+      const isWordCompleted = activeInput === activeWord;
+      const timeSpentOnWord = currentWordStartTimeRef.current ? (Date.now() - currentWordStartTimeRef.current) : 1000;
+      const correctionTime = currentWordErrorStartRef.current ? (Date.now() - currentWordErrorStartRef.current) : 0;
+      
+      wordErrorsListRef.current.push({
+        targetWord: activeWord,
+        typedWord: currentWordMistypedSnapshotRef.current || activeInput || activeWord,
+        mistakes: currentWordMistakesRef.current,
+        corrected: isWordCompleted,
+        timeSpentMs: timeSpentOnWord,
+        backspacesUsed: currentWordBackspacesRef.current,
+        correctionMethod: currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None',
+        correctionTimeMs: correctionTime,
+        timestamp: Date.now()
+      });
+    }
+
     const totalTypedChars = correctChars + wrongChars;
     const minutes = Math.max(1 / 60, timeSpent / 60);
     const grossWpm = Math.round((totalTypedChars / 5) / minutes);
     const netWpm = Math.max(0, Math.round(((correctChars - wrongChars) / 5) / minutes));
     const accuracy = totalTypedChars > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalTypedChars) * 100))) : 100;
+    
+    // Keystroke Accuracy factors in every mistake made before correction
+    const totalKeystrokeAttempts = totalTypedChars + mistakesCountRef.current;
+    const keystrokeAccuracy = totalKeystrokeAttempts > 0 
+      ? Math.max(0, Math.min(100, Math.round((totalTypedChars / totalKeystrokeAttempts) * 100)))
+      : accuracy;
+
+    const correctedMistakesCount = wordErrorsListRef.current.filter(w => w.corrected).reduce((acc, w) => acc + w.mistakes, 0);
+    const uncorrectedMistakesCount = wordErrorsListRef.current.filter(w => !w.corrected).reduce((acc, w) => acc + w.mistakes, 0);
 
     let performanceGrade: 'Excellent' | 'Good' | 'Average' | 'Needs Improvement' = 'Average';
     if (netWpm >= 50 && accuracy >= 95) performanceGrade = 'Excellent';
@@ -477,6 +510,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       grossWpm,
       netWpm,
       accuracy,
+      finalAccuracy: accuracy,
+      keystrokeAccuracy,
+      correctedMistakesCount,
+      uncorrectedMistakesCount,
       totalCharactersTyped: totalTypedChars,
       correctCharacters: correctChars,
       wrongCharacters: wrongChars,
@@ -488,9 +525,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       consistencyPercent: consistency,
       performanceGrade,
       wpmOverTime: wpmSamplesRef.current.length > 0 ? wpmSamplesRef.current : [{ second: timeSpent, wpm: netWpm, rawWpm: grossWpm, errors: mistakesCountRef.current }],
-      keyStatsMap: keyStatsRef.current,
-      mistypedWordsMap: mistypedWordsRef.current,
-      mistypedCharsMap: mistypedCharsRef.current,
+      keyStatsMap: { ...keyStatsRef.current },
+      mistypedWordsMap: { ...mistypedWordsRef.current },
+      mistypedCharsMap: { ...mistypedCharsRef.current },
       slowWordsMap: {},
       wordErrors: [...wordErrorsListRef.current],
       charErrors: [...charErrorsListRef.current],
@@ -610,8 +647,16 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         backspacesCountRef.current = next;
         return next;
       });
+      currentWordBackspacesRef.current++;
       playKeypressSound(settings.sound, settings.soundVolume);
       setRejectedKeyInfo(null);
+
+      // Note Backspace correction on active character errors for this word
+      charErrorsListRef.current.forEach(cErr => {
+        if (cErr.targetWord === currentTargetWord && !cErr.corrected) {
+          cErr.correctionMethod = 'Backspace';
+        }
+      });
 
       if (settings.language === 'nepali') {
         if (romanBuffer.length > 0) {
@@ -644,10 +689,15 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       setIsTestRunning(true);
       startTimeRef.current = now;
       setStartTime(now);
+      currentWordStartTimeRef.current = now;
       if (!sessionIdRef.current) {
         sessionIdRef.current = 'session_' + now;
       }
       emitLiveSession('Abandoned');
+    }
+
+    if (!currentWordStartTimeRef.current) {
+      currentWordStartTimeRef.current = now;
     }
 
     // Handle Space Key -> Word Commit
@@ -671,6 +721,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           mistakesCountRef.current = next;
           return next;
         });
+        currentWordMistakesRef.current++;
+        if (!currentWordErrorStartRef.current) {
+          currentWordErrorStartRef.current = Date.now();
+        }
         setKeystrokes(prev => prev + 1);
         setInputShake(true);
         setRejectedKeyInfo({
@@ -678,25 +732,80 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           expected: validation.expectedKey === ' ' ? 'Space' : validation.expectedKey
         });
 
+        const mistypedSnapshot = settings.language === 'nepali'
+          ? (typedInput ? `${typedInput} ` : ' ')
+          : (currentBuf ? `${currentBuf} ` : ' ');
+        currentWordMistypedSnapshotRef.current = mistypedSnapshot;
+
         mistypedCharsRef.current[' '] = (mistypedCharsRef.current[' '] || 0) + 1;
         mistypedWordsRef.current[currentTargetWord] = (mistypedWordsRef.current[currentTargetWord] || 0) + 1;
-        charErrorsListRef.current.push({
-          char: validation.expectedKey || ' ',
-          typedChar: ' ',
-          count: 1,
-          timestamp: Date.now()
-        });
+        
+        const existingCharErr = charErrorsListRef.current.find(
+          c => c.targetWord === currentTargetWord && c.targetChar === (validation.expectedKey || ' ') && c.typedChar === ' '
+        );
+        if (existingCharErr) {
+          existingCharErr.frequency += 1;
+          existingCharErr.timestamp = Date.now();
+        } else {
+          charErrorsListRef.current.push({
+            targetChar: validation.expectedKey || ' ',
+            typedChar: ' ',
+            frequency: 1,
+            targetWord: currentTargetWord,
+            position: currentBuf.length,
+            corrected: false,
+            correctionMethod: 'None',
+            timestamp: Date.now()
+          });
+        }
 
         onKeypressMetric('space', false, latency);
         onLiveStatsChange?.(computeLiveStats());
         return;
       }
 
-      // Space ACCEPTED: Current word is completely matched -> advance to next word!
+      // Space ACCEPTED: Current word is completely matched -> commit word!
       playKeypressSound(settings.sound, settings.soundVolume);
       setKeystrokes(prev => prev + 1);
       setRejectedKeyInfo(null);
       onKeypressMetric('space', true, latency);
+
+      // If user made mistakes on this word and corrected it with Backspace, record the DetailedWordError
+      if (currentWordMistakesRef.current > 0) {
+        const timeSpentOnWord = currentWordStartTimeRef.current ? (Date.now() - currentWordStartTimeRef.current) : 1000;
+        const correctionTime = currentWordErrorStartRef.current ? (Date.now() - currentWordErrorStartRef.current) : 0;
+        
+        wordErrorsListRef.current.push({
+          targetWord: currentTargetWord,
+          typedWord: currentWordMistypedSnapshotRef.current || currentTargetWord,
+          mistakes: currentWordMistakesRef.current,
+          corrected: true,
+          timeSpentMs: timeSpentOnWord,
+          backspacesUsed: currentWordBackspacesRef.current,
+          correctionMethod: currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None',
+          correctionTimeMs: correctionTime,
+          errorPosition: 0,
+          timestamp: Date.now()
+        });
+
+        // Mark character errors as corrected
+        charErrorsListRef.current.forEach(cErr => {
+          if (cErr.targetWord === currentTargetWord) {
+            cErr.corrected = true;
+            cErr.correctionMethod = currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None';
+            if (!cErr.correctionTimeMs && currentWordErrorStartRef.current) {
+              cErr.correctionTimeMs = Date.now() - currentWordErrorStartRef.current;
+            }
+          }
+        });
+      }
+
+      // Reset word error tracking for the next word
+      currentWordMistakesRef.current = 0;
+      currentWordBackspacesRef.current = 0;
+      currentWordMistypedSnapshotRef.current = '';
+      currentWordStartTimeRef.current = Date.now();
+      currentWordErrorStartRef.current = null;
 
       const nextHistory = [...typedHistory, currentTargetWord];
       typedHistoryRef.current = nextHistory;
@@ -743,6 +852,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           mistakesCountRef.current = next;
           return next;
         });
+        currentWordMistakesRef.current++;
+        if (!currentWordErrorStartRef.current) {
+          currentWordErrorStartRef.current = Date.now();
+        }
         setKeystrokes(prev => prev + 1);
         setInputShake(true);
         setRejectedKeyInfo({
@@ -750,14 +863,39 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           expected: validation.expectedKey === ' ' ? 'Space' : validation.expectedKey
         });
 
+        // Compute realistic mistyped word snapshot (e.g. "संवीधान" or candidate representation)
+        let candidateSnapshot = '';
+        if (settings.language === 'nepali') {
+          const attemptedBuf = currentBuf + e.key;
+          const transliteratedAttempt = transliterateWordRuleBased(attemptedBuf);
+          candidateSnapshot = transliteratedAttempt || (typedInput + e.key);
+        } else {
+          candidateSnapshot = currentBuf + e.key;
+        }
+        currentWordMistypedSnapshotRef.current = candidateSnapshot;
+
         mistypedCharsRef.current[e.key] = (mistypedCharsRef.current[e.key] || 0) + 1;
         mistypedWordsRef.current[currentTargetWord] = (mistypedWordsRef.current[currentTargetWord] || 0) + 1;
-        charErrorsListRef.current.push({
-          char: validation.expectedKey || e.key,
-          typedChar: e.key,
-          count: 1,
-          timestamp: Date.now()
-        });
+        
+        const expectedCharStr = validation.expectedKey === ' ' ? 'Space' : (validation.expectedKey || e.key);
+        const existingCharErr = charErrorsListRef.current.find(
+          c => c.targetWord === currentTargetWord && c.targetChar === expectedCharStr && c.typedChar === e.key
+        );
+        if (existingCharErr) {
+          existingCharErr.frequency += 1;
+          existingCharErr.timestamp = Date.now();
+        } else {
+          charErrorsListRef.current.push({
+            targetChar: expectedCharStr,
+            typedChar: e.key,
+            frequency: 1,
+            targetWord: currentTargetWord,
+            position: currentBuf.length,
+            corrected: false,
+            correctionMethod: 'None',
+            timestamp: Date.now()
+          });
+        }
 
         onKeypressMetric(e.key.toLowerCase(), false, latency);
         onLiveStatsChange?.(computeLiveStats());
@@ -785,6 +923,34 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
       // Auto-complete if last word of the test is complete
       if (isLastWord && validation.isWordComplete) {
+        if (currentWordMistakesRef.current > 0) {
+          const timeSpentOnWord = currentWordStartTimeRef.current ? (Date.now() - currentWordStartTimeRef.current) : 1000;
+          const correctionTime = currentWordErrorStartRef.current ? (Date.now() - currentWordErrorStartRef.current) : 0;
+          
+          wordErrorsListRef.current.push({
+            targetWord: currentTargetWord,
+            typedWord: currentWordMistypedSnapshotRef.current || currentTargetWord,
+            mistakes: currentWordMistakesRef.current,
+            corrected: true,
+            timeSpentMs: timeSpentOnWord,
+            backspacesUsed: currentWordBackspacesRef.current,
+            correctionMethod: currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None',
+            correctionTimeMs: correctionTime,
+            errorPosition: 0,
+            timestamp: Date.now()
+          });
+
+          charErrorsListRef.current.forEach(cErr => {
+            if (cErr.targetWord === currentTargetWord) {
+              cErr.corrected = true;
+              cErr.correctionMethod = currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None';
+              if (!cErr.correctionTimeMs && currentWordErrorStartRef.current) {
+                cErr.correctionTimeMs = Date.now() - currentWordErrorStartRef.current;
+              }
+            }
+          });
+        }
+
         const nextHistory = [...typedHistory, currentTargetWord];
         typedHistoryRef.current = nextHistory;
         setTypedHistory(nextHistory);

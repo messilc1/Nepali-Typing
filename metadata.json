@@ -1,6 +1,6 @@
 {
   "name": "Nepali Typing Pro",
-  "description": "Professional Romanized Nepali Unicode typing test, practice mode, legal vocabulary training, keyboard heatmap, and performance analytics.",
+  "description": "Professional Romanized Nepali Unicode typing tutor with comprehensive English Typing Academy (7 levels, WPM milestones, keyboard guide, and AI weak-key improvement).",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -11,6 +11,7 @@ import { HistoryAnalytics } from './components/HistoryAnalytics';
 import { TypingImprovementView } from './components/TypingImprovementView';
 import { CertificationView } from './components/CertificationView';
 import { AboutView } from './components/AboutView';
+import { EnglishTypingSection } from './components/english/EnglishTypingSection';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
 
@@ -82,11 +83,11 @@ export default function App() {
   const [activeTab, setActiveTabState] = useState<NavigationTab>(() => {
     try {
       const hash = window.location.hash.replace('#', '');
-      if (['test', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+      if (['test', 'english', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
         return hash as NavigationTab;
       }
       const saved = localStorage.getItem('nepali_typing_active_tab');
-      if (saved && ['test', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(saved)) {
+      if (saved && ['test', 'english', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(saved)) {
         return saved as NavigationTab;
       }
     } catch {}
@@ -107,7 +108,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['test', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
+      if (['test', 'english', 'practice', 'improvement', 'legal', 'analytics', 'certification', 'about'].includes(hash)) {
         setActiveTabState(hash as NavigationTab);
       }
     };
@@ -440,6 +441,15 @@ export default function App() {
           </div>
         )}
 
+        {activeTab === 'english' && (
+          <EnglishTypingSection
+            userStats={userStats}
+            liveKeyStatsMap={keyStatsMap}
+            onTestComplete={handleTestComplete}
+            onNavigateToNepali={() => setActiveTab('test')}
+          />
+        )}
+
         {activeTab === 'practice' && (
           <PracticeMode
             settings={settings}
@@ -527,7 +537,9 @@ export default function App() {
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 font-semibold text-slate-600 dark:text-slate-400">
-              <button onClick={() => setActiveTab('test')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Typing Test</button>
+              <button onClick={() => setActiveTab('test')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Nepali Typing</button>
+              <span>&bull;</span>
+              <button onClick={() => setActiveTab('english')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-bold text-emerald-600 dark:text-emerald-400">English Typing</button>
               <span>&bull;</span>
               <button onClick={() => setActiveTab('practice')} className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">Practice Mode</button>
               <span>&bull;</span>

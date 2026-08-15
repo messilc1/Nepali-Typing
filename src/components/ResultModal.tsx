@@ -177,7 +177,7 @@ https://nepalitypingpro.app
         {/* Accuracy */}
         <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 dark:from-emerald-950/40 dark:to-teal-950/30 p-6 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/80 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Accuracy</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Final Accuracy</span>
             <Target className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="my-3">
@@ -185,11 +185,14 @@ https://nepalitypingpro.app
               {result.accuracy}%
             </div>
             <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mt-1">
-              Precision
+              Submitted Text Precision
             </div>
           </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-            Mistakes: <strong>{result.mistakesCount}</strong>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center justify-between">
+            <span>Mistakes Made: <strong className="text-rose-600 dark:text-rose-400">{result.mistakesCount}</strong></span>
+            {result.backspacesCount > 0 && (
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">Corrected via Backspace</span>
+            )}
           </div>
         </div>
 
@@ -265,11 +268,48 @@ https://nepalitypingpro.app
         
         {/* Most Mistyped Words */}
         <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <h4 className="font-extrabold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-            Most Mistyped Words
-          </h4>
-          {mistypedWords.length > 0 ? (
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-extrabold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <span>Mistyped Words & Corrections</span>
+            </h4>
+            <span className="text-[11px] font-semibold text-slate-400">
+              Recorded during typing
+            </span>
+          </div>
+
+          {result.wordErrors && result.wordErrors.length > 0 ? (
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {result.wordErrors.map((err, i) => (
+                <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 font-nepali text-sm">
+                      {err.targetWord}
+                    </span>
+                    {err.typedWord && err.typedWord !== err.targetWord && (
+                      <span className="text-rose-500 font-semibold font-nepali">
+                        (typed: {err.typedWord})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {err.corrected ? (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-extrabold text-[10px] flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Corrected (Backspace)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-extrabold text-[10px]">
+                        Uncorrected
+                      </span>
+                    )}
+                    <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950 px-2 py-0.5 rounded-md">
+                      {err.mistakes}x
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : mistypedWords.length > 0 ? (
             <div className="space-y-2">
               {mistypedWords.map(([word, count], i) => (
                 <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-sm">
@@ -288,7 +328,7 @@ https://nepalitypingpro.app
           ) : (
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
               <CheckCircle2 className="w-5 h-5" />
-              <span>Perfect! No word mistakes detected in this test.</span>
+              <span>Perfect! Zero word mistakes detected in this test.</span>
             </div>
           )}
         </div>
