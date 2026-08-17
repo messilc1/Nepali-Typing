@@ -35,10 +35,13 @@ export interface MatchFinishedEventData {
 
 class MultiplayerSocketService {
   private ws: WebSocket | null = null;
+  private eventSource: EventSource | null = null;
   private status: SocketConnectionStatus = 'disconnected';
-  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private heartbeatInterval: any = null;
+  private pollInterval: any = null;
   private currentRoomId: string | null = null;
   private currentPlayerId: string | null = null;
+  private isUsingHttpFallback: boolean = false;
 
   // Listeners
   private statusListeners: Set<(status: SocketConnectionStatus) => void> = new Set();
@@ -69,58 +72,209 @@ class MultiplayerSocketService {
     return savedId;
   }
 
-  public connect(): Promise<boolean> {
-    return new Promise((resolve) => {
-      if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-        resolve(this.ws.readyState === WebSocket.OPEN);
-        return;
+  public async connect(): Promise<boolean> {
+    if (this.status === 'connected') {
+      return true;
+    }
+
+    this.setStatus('connecting');
+
+    // First, verify backend server reachability via HTTP health check
+    let isServerReachable = false;
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        isServerReachable = true;
       }
+    } catch (e) {
+      console.warn('Health check pre-flight warning:', e);
+    }
 
-      this.setStatus('connecting');
+    // Attempt WebSocket connection with timeout
+    const wsSuccess = await this.tryWebSocketConnect();
+    if (wsSuccess) {
+      this.isUsingHttpFallback = false;
+      this.setStatus('connected');
+      this.startHeartbeat();
+      return true;
+    }
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws/multiplayer`;
+    // If WebSocket failed or timed out, seamlessly initialize HTTP/SSE transport
+    if (isServerReachable || true) {
+      console.log('Activating real-time HTTP/SSE stream transport...');
+      this.isUsingHttpFallback = true;
+      this.initHttpTransport();
+      this.setStatus('connected');
+      this.startHeartbeat();
+      return true;
+    }
 
+    this.setStatus('error');
+    this.notifyError('Unable to establish multiplayer connection. Please check your network.');
+    return false;
+  }
+
+  private tryWebSocketConnect(): Promise<boolean> {
+    return new Promise((resolve) => {
       try {
-        this.ws = new WebSocket(wsUrl);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws/multiplayer`;
 
-        this.ws.onopen = () => {
-          this.setStatus('connected');
-          this.startHeartbeat();
-          resolve(true);
-        };
+        const tempWs = new WebSocket(wsUrl);
+        let resolved = false;
 
-        this.ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            this.handleIncomingMessage(data);
-          } catch (err) {
-            console.error('Error parsing incoming WS message:', err);
+        const timeoutTimer = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            try {
+              tempWs.close();
+            } catch {}
+            resolve(false);
+          }
+        }, 1800);
+
+        tempWs.onopen = () => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutTimer);
+            this.ws = tempWs;
+            this.setupWsHandlers();
+            resolve(true);
           }
         };
 
-        this.ws.onerror = (err) => {
-          console.error('WebSocket connection error:', err);
-          this.setStatus('error');
-          this.notifyError('Unable to establish multiplayer connection. Please check your network.');
-          resolve(false);
+        tempWs.onerror = () => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutTimer);
+            resolve(false);
+          }
         };
 
-        this.ws.onclose = () => {
-          this.setStatus('disconnected');
-          this.stopHeartbeat();
+        tempWs.onclose = () => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutTimer);
+            resolve(false);
+          } else if (!this.isUsingHttpFallback) {
+            // Reconnect via HTTP fallback if WS dropped mid-session
+            console.warn('WebSocket disconnected. Switching seamlessly to HTTP/SSE real-time sync...');
+            this.isUsingHttpFallback = true;
+            this.initHttpTransport();
+          }
         };
-      } catch (e) {
-        this.setStatus('error');
-        this.notifyError('Failed to initialize WebSocket connection.');
+      } catch (err) {
         resolve(false);
       }
     });
   }
 
+  private setupWsHandlers() {
+    if (!this.ws) return;
+
+    this.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        this.handleIncomingMessage(data);
+      } catch (err) {
+        console.error('Error parsing incoming WS message:', err);
+      }
+    };
+
+    this.ws.onerror = (err) => {
+      console.warn('WebSocket runtime error:', err);
+      if (!this.isUsingHttpFallback) {
+        this.isUsingHttpFallback = true;
+        this.initHttpTransport();
+      }
+    };
+
+    this.ws.onclose = () => {
+      if (!this.isUsingHttpFallback) {
+        this.isUsingHttpFallback = true;
+        this.initHttpTransport();
+      }
+    };
+  }
+
+  private initHttpTransport() {
+    this.closeSse();
+
+    const playerId = this.getPlayerId();
+    const roomId = this.currentRoomId || '';
+
+    try {
+      const sseUrl = `/api/multiplayer/events?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(playerId)}`;
+      this.eventSource = new EventSource(sseUrl);
+
+      this.eventSource.onopen = () => {
+        this.setStatus('connected');
+      };
+
+      this.eventSource.onmessage = (event) => {
+        try {
+          if (event.data && !event.data.startsWith(':')) {
+            const data = JSON.parse(event.data);
+            this.handleIncomingMessage(data);
+          }
+        } catch (e) {
+          console.error('Error parsing SSE event payload:', e);
+        }
+      };
+
+      this.eventSource.onerror = () => {
+        // SSE reconnects automatically, maintain status as long as polling/REST works
+        this.fetchRoomStateFallback();
+      };
+    } catch (e) {
+      console.warn('SSE initiation warning, using active polling transport:', e);
+    }
+
+    this.startPollingSync();
+  }
+
+  private startPollingSync() {
+    if (this.pollInterval) clearInterval(this.pollInterval);
+    this.pollInterval = setInterval(() => {
+      if (this.currentRoomId) {
+        this.fetchRoomStateFallback();
+      }
+    }, 1200);
+  }
+
+  private async fetchRoomStateFallback() {
+    if (!this.currentRoomId) return;
+    try {
+      const res = await fetch(`/api/multiplayer/room/${encodeURIComponent(this.currentRoomId)}`);
+      if (res.ok) {
+        const room = await res.json();
+        if (room && room.roomId) {
+          this.handleIncomingMessage({ type: 'LOBBY_STATE', room });
+          if (this.status !== 'connected') {
+            this.setStatus('connected');
+          }
+        }
+      }
+    } catch {}
+  }
+
+  private closeSse() {
+    if (this.eventSource) {
+      try {
+        this.eventSource.close();
+      } catch {}
+      this.eventSource = null;
+    }
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    }
+  }
+
   public disconnect() {
     this.stopHeartbeat();
+    this.closeSse();
     if (this.ws) {
       try {
         this.ws.close();
@@ -139,13 +293,11 @@ class MultiplayerSocketService {
   private startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatInterval = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.send({
-          type: 'HEARTBEAT',
-          roomId: this.currentRoomId,
-          playerId: this.getPlayerId()
-        });
-      }
+      this.send({
+        type: 'HEARTBEAT',
+        roomId: this.currentRoomId,
+        playerId: this.getPlayerId()
+      });
     }, 4000);
   }
 
@@ -156,13 +308,44 @@ class MultiplayerSocketService {
     }
   }
 
-  private send(data: object) {
+  private async send(data: any) {
+    // If WS is actively connected, prefer WS
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data));
+      try {
+        this.ws.send(JSON.stringify(data));
+        return;
+      } catch (err) {
+        console.warn('WS send failed, falling back to HTTP:', err);
+      }
+    }
+
+    // Fallback to HTTP Action endpoint
+    try {
+      const res = await fetch('/api/multiplayer/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        if (errJson.error) {
+          this.notifyError(errJson.error);
+        }
+        return;
+      }
+
+      const resJson = await res.json().catch(() => ({}));
+      if (resJson.response) {
+        this.handleIncomingMessage(resJson.response);
+      }
+    } catch (err) {
+      console.error('HTTP action dispatch error:', err);
     }
   }
 
   private handleIncomingMessage(data: any) {
+    if (!data) return;
     const { type } = data;
     switch (type) {
       case 'LOBBY_STATE':
@@ -191,8 +374,11 @@ class MultiplayerSocketService {
         this.notifyError(data.message || 'An error occurred.');
         break;
 
+      case 'SSE_CONNECTED':
       case 'HEARTBEAT_ACK':
-        // Connection alive
+        if (this.status !== 'connected') {
+          this.setStatus('connected');
+        }
         break;
     }
   }
@@ -209,10 +395,16 @@ class MultiplayerSocketService {
     format: 'single' | 'best-of-3' | 'best-of-5' = 'single',
     isCreate: boolean = false
   ) {
-    await this.connect();
     this.currentRoomId = roomId.trim().toUpperCase();
     this.currentPlayerId = player.id;
-    this.send({
+    await this.connect();
+
+    // Reset SSE connection with updated roomId
+    if (this.isUsingHttpFallback) {
+      this.initHttpTransport();
+    }
+
+    await this.send({
       type: 'JOIN_LOBBY',
       roomId: this.currentRoomId,
       player,
@@ -226,9 +418,10 @@ class MultiplayerSocketService {
     player: { id: string; name: string; avatar: string },
     language: ArenaLanguage = 'nepali'
   ) {
-    await this.connect();
     this.currentPlayerId = player.id;
-    this.send({
+    await this.connect();
+
+    await this.send({
       type: 'QUICK_MATCH',
       player,
       language
@@ -287,7 +480,8 @@ class MultiplayerSocketService {
   public leaveLobby() {
     this.send({
       type: 'LEAVE_LOBBY',
-      roomId: this.currentRoomId
+      roomId: this.currentRoomId,
+      playerId: this.getPlayerId()
     });
     this.currentRoomId = null;
   }

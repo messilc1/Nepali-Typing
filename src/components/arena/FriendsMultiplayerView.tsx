@@ -6,6 +6,7 @@ import {
   MultiplayerPlayer,
   OfficialMultiplayerResult
 } from '../../types/arenaTypes';
+import { getAvatarIcon } from '../../data/arenaData';
 import {
   multiplayerSocket,
   SocketConnectionStatus,
@@ -149,7 +150,7 @@ export const FriendsMultiplayerView: React.FC<FriendsMultiplayerViewProps> = ({
       {
         id: playerId,
         name: displayName,
-        avatar: profile.selectedAvatar || '🏎️'
+        avatar: getAvatarIcon(profile.selectedAvatar)
       },
       selectedLanguage,
       selectedFormat,
@@ -172,7 +173,7 @@ export const FriendsMultiplayerView: React.FC<FriendsMultiplayerViewProps> = ({
       {
         id: playerId,
         name: displayName,
-        avatar: profile.selectedAvatar || '🚀'
+        avatar: getAvatarIcon(profile.selectedAvatar)
       },
       selectedLanguage,
       selectedFormat,
@@ -279,7 +280,7 @@ export const FriendsMultiplayerView: React.FC<FriendsMultiplayerViewProps> = ({
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-xl shadow-inner">
-            {profile.selectedAvatar || '🏎️'}
+            {getAvatarIcon(profile.selectedAvatar)}
           </div>
           <div>
             <div className="text-xs text-slate-400 font-medium">Your Racer Identity</div>
@@ -580,7 +581,7 @@ export const FriendsMultiplayerView: React.FC<FriendsMultiplayerViewProps> = ({
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl">
-                          {p.avatar || '🏎️'}
+                          {getAvatarIcon(p.avatar)}
                         </div>
                         {p.connected ? (
                           <span

@@ -23,28 +23,75 @@ async function startServer() {
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
-    res.json({
-      roomId: room.roomId,
-      matchId: room.matchId,
-      status: room.status,
-      language: room.language,
-      playerCount: room.players.size,
-      players: Array.from(room.players.values()).map((p) => ({
-        id: p.id,
-        name: p.name,
-        avatar: p.avatar,
-        isHost: p.isHost,
-        isReady: p.isReady,
-        connected: p.connected
-      }))
+    res.json(multiplayerManager.serializeLobby(room));
+  });
+
+  // Authoritative REST Action Endpoint (Dual transport fallback)
+  app.post('/api/multiplayer/action', (req, res) => {
+    const result = multiplayerManager.processAction(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Action failed' });
+    }
+    res.json({ success: true, response: result.response });
+  });
+
+  // Server-Sent Events (SSE) Real-time Stream Endpoint
+  app.get('/api/multiplayer/events', (req, res) => {
+    const roomId = (req.query.roomId as string || '').trim().toUpperCase();
+    const playerId = (req.query.playerId as string || '').trim();
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'Access-Control-Allow-Origin': '*'
     });
+
+    // Send initial connected confirmation
+    res.write(`data: ${JSON.stringify({ type: 'SSE_CONNECTED', serverTime: Date.now() })}\n\n`);
+
+    if (roomId && playerId) {
+      const room = multiplayerManager.getRoom(roomId);
+      if (room) {
+        // Send initial lobby state
+        res.write(`data: ${JSON.stringify({ type: 'LOBBY_STATE', room: multiplayerManager.serializeLobby(room) })}\n\n`);
+      }
+
+      // Register listener
+      const eventCallback = (event: any) => {
+        try {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        } catch (err) {
+          // Client disconnected
+        }
+      };
+
+      multiplayerManager.addSseListener(roomId, playerId, eventCallback);
+
+      // Keepalive ping every 10s
+      const pingInterval = setInterval(() => {
+        try {
+          res.write(': keepalive\n\n');
+        } catch {
+          clearInterval(pingInterval);
+        }
+      }, 10000);
+
+      req.on('close', () => {
+        clearInterval(pingInterval);
+        multiplayerManager.removeSseListener(roomId, playerId);
+      });
+    } else {
+      req.on('close', () => {});
+    }
   });
 
   // Create HTTP server
   const httpServer = http.createServer(app);
 
-  // Attach WebSocket Server for real-time multiplayer
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/multiplayer' });
+  // Attach WebSocket Server
+  const wss = new WebSocketServer({ noServer: true });
 
   wss.on('connection', (ws: WebSocket, req) => {
     let currentPlayerId: string | null = null;
@@ -53,221 +100,13 @@ async function startServer() {
     ws.on('message', (messageBuffer) => {
       try {
         const data = JSON.parse(messageBuffer.toString());
-        const { type } = data;
+        if (data.roomId) currentRoomId = String(data.roomId).trim().toUpperCase();
+        if (data.player?.id) currentPlayerId = String(data.player.id);
+        if (data.playerId) currentPlayerId = String(data.playerId);
 
-        switch (type) {
-          case 'JOIN_LOBBY': {
-            const { roomId, player, language, format, isCreate } = data;
-            if (!roomId || !player?.id) {
-              return ws.send(JSON.stringify({ type: 'ERROR', message: 'Missing roomId or player data' }));
-            }
-
-            currentPlayerId = player.id;
-            currentRoomId = roomId.trim().toUpperCase();
-
-            let room = multiplayerManager.getRoom(currentRoomId);
-            if (!room) {
-              if (isCreate) {
-                room = multiplayerManager.createRoom(
-                  currentRoomId,
-                  player,
-                  language || 'nepali',
-                  format || 'single',
-                  false
-                );
-              } else {
-                return ws.send(
-                  JSON.stringify({
-                    type: 'ERROR',
-                    message: `Room "${currentRoomId}" not found. Please verify the code.`
-                  })
-                );
-              }
-            }
-
-            multiplayerManager.addPlayerToRoom(currentRoomId, player, ws);
-            const lobbyPayload = multiplayerManager.serializeLobby(room);
-
-            // Broadcast updated lobby to all participants
-            multiplayerManager.broadcastToRoom(room, {
-              type: 'LOBBY_STATE',
-              room: lobbyPayload,
-              message: `${player.name} joined the arena.`
-            });
-            break;
-          }
-
-          case 'QUICK_MATCH': {
-            const { player, language } = data;
-            if (!player?.id) return;
-
-            currentPlayerId = player.id;
-            const chosenLang = language || 'nepali';
-
-            // Find existing public room or create a new public room
-            let room = multiplayerManager.findPublicMatchmakingRoom(chosenLang, player.id);
-            if (!room) {
-              const newRoomCode = `PUB-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-              room = multiplayerManager.createRoom(newRoomCode, player, chosenLang, 'single', true);
-            }
-
-            currentRoomId = room.roomId;
-            multiplayerManager.addPlayerToRoom(currentRoomId, player, ws);
-            const lobbyPayload = multiplayerManager.serializeLobby(room);
-
-            multiplayerManager.broadcastToRoom(room, {
-              type: 'LOBBY_STATE',
-              room: lobbyPayload,
-              message: `${player.name} matched!`
-            });
-            break;
-          }
-
-          case 'TOGGLE_READY': {
-            const { roomId, playerId, isReady } = data;
-            const targetRoomId = roomId || currentRoomId;
-            const targetPlayerId = playerId || currentPlayerId;
-            if (!targetRoomId || !targetPlayerId) return;
-
-            const room = multiplayerManager.toggleReady(targetRoomId, targetPlayerId, isReady);
-            if (room) {
-              multiplayerManager.broadcastToRoom(room, {
-                type: 'LOBBY_STATE',
-                room: multiplayerManager.serializeLobby(room)
-              });
-            }
-            break;
-          }
-
-          case 'UPDATE_SETTINGS': {
-            const { roomId, language, format } = data;
-            const targetRoomId = roomId || currentRoomId;
-            if (!targetRoomId) return;
-
-            const room = multiplayerManager.updateRoomSettings(targetRoomId, language, format);
-            if (room) {
-              multiplayerManager.broadcastToRoom(room, {
-                type: 'LOBBY_STATE',
-                room: multiplayerManager.serializeLobby(room)
-              });
-            }
-            break;
-          }
-
-          case 'START_MATCH': {
-            const { roomId, countdownDurationMs } = data;
-            const targetRoomId = roomId || currentRoomId;
-            if (!targetRoomId) return;
-
-            const room = multiplayerManager.startCountdown(targetRoomId, countdownDurationMs || 4000);
-            if (room) {
-              // Send authoritative start event with target text & start timestamp to all players
-              multiplayerManager.broadcastToRoom(room, {
-                type: 'MATCH_COUNTDOWN',
-                matchId: room.matchId,
-                startTimestamp: room.startTimestamp,
-                countdownDurationMs: room.countdownDurationMs,
-                targetText: room.targetText,
-                textId: room.textId,
-                textTitle: room.textTitle,
-                language: room.language,
-                currentRound: room.currentRound,
-                totalRounds: room.totalRounds,
-                players: Array.from(room.players.values())
-              });
-            }
-            break;
-          }
-
-          case 'UPDATE_PROGRESS': {
-            const { roomId, playerId, progress, charsTyped, wordsTyped, accuracy, mistakes, isFinished } = data;
-            const targetRoomId = roomId || currentRoomId;
-            const targetPlayerId = playerId || currentPlayerId;
-            if (!targetRoomId || !targetPlayerId) return;
-
-            const result = multiplayerManager.updatePlayerProgress(targetRoomId, targetPlayerId, {
-              progress,
-              charsTyped,
-              wordsTyped,
-              accuracy,
-              mistakes,
-              isFinished
-            });
-
-            if (result) {
-              const { room, isFirstFinished, allFinished } = result;
-
-              // Broadcast live players progress to all connected screens
-              multiplayerManager.broadcastToRoom(room, {
-                type: 'PLAYERS_PROGRESS_UPDATE',
-                matchId: room.matchId,
-                players: Array.from(room.players.values())
-              });
-
-              if (allFinished) {
-                multiplayerManager.broadcastToRoom(room, {
-                  type: 'MATCH_FINISHED',
-                  matchId: room.matchId,
-                  results: room.results,
-                  scores: room.scores,
-                  currentRound: room.currentRound,
-                  totalRounds: room.totalRounds
-                });
-              }
-            }
-            break;
-          }
-
-          case 'NEXT_ROUND': {
-            const { roomId } = data;
-            const targetRoomId = roomId || currentRoomId;
-            if (!targetRoomId) return;
-
-            const room = multiplayerManager.prepareNextRound(targetRoomId);
-            if (room) {
-              multiplayerManager.broadcastToRoom(room, {
-                type: 'LOBBY_STATE',
-                room: multiplayerManager.serializeLobby(room)
-              });
-            }
-            break;
-          }
-
-          case 'HEARTBEAT': {
-            const { roomId, playerId } = data;
-            const targetRoomId = roomId || currentRoomId;
-            const targetPlayerId = playerId || currentPlayerId;
-            if (targetRoomId && targetPlayerId) {
-              const room = multiplayerManager.getRoom(targetRoomId);
-              if (room) {
-                const player = room.players.get(targetPlayerId);
-                if (player) {
-                  player.lastHeartbeat = Date.now();
-                  player.connected = true;
-                }
-              }
-            }
-            ws.send(JSON.stringify({ type: 'HEARTBEAT_ACK', timestamp: Date.now() }));
-            break;
-          }
-
-          case 'LEAVE_LOBBY': {
-            if (currentRoomId) {
-              const room = multiplayerManager.getRoom(currentRoomId);
-              if (room && currentPlayerId) {
-                const player = room.players.get(currentPlayerId);
-                if (player) {
-                  player.connected = false;
-                }
-                multiplayerManager.broadcastToRoom(room, {
-                  type: 'LOBBY_STATE',
-                  room: multiplayerManager.serializeLobby(room),
-                  message: `${player?.name || 'Player'} left the lobby.`
-                });
-              }
-            }
-            break;
-          }
+        const result = multiplayerManager.processAction(data, ws);
+        if (!result.success && result.error) {
+          ws.send(JSON.stringify({ type: 'ERROR', message: result.error }));
         }
       } catch (err) {
         console.error('Error processing WebSocket message:', err);
@@ -288,10 +127,22 @@ async function startServer() {
     });
   });
 
+  // Explicit WebSocket Upgrade Handling
+  httpServer.on('upgrade', (request, socket, head) => {
+    const pathname = request.url ? new URL(request.url, `http://${request.headers.host || 'localhost'}`).pathname : '';
+    if (pathname === '/ws/multiplayer' || pathname.startsWith('/ws/multiplayer')) {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      // Don't terminate other upgrades unless necessary
+    }
+  });
+
   // Vite middleware in dev or static in prod
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa'
     });
     app.use(vite.middlewares);

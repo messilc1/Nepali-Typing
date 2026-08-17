@@ -53,6 +53,7 @@ export interface ServerRoom {
   startTimestamp: number | null; // Epoch ms when typing starts
   players: Map<string, ServerPlayer>;
   connections: Map<string, WebSocket>;
+  eventListeners: Map<string, (event: any) => void>;
   results: OfficialRaceResult[];
   isPublicMatchmaking?: boolean;
 }
@@ -156,6 +157,7 @@ export class MultiplayerRoomManager {
       startTimestamp: null,
       players: new Map(),
       connections: new Map(),
+      eventListeners: new Map(),
       results: [],
       isPublicMatchmaking: isPublic
     };
@@ -210,7 +212,7 @@ export class MultiplayerRoomManager {
   public addPlayerToRoom(
     roomId: string,
     player: { id: string; name: string; avatar: string },
-    ws: WebSocket
+    ws?: WebSocket
   ): ServerRoom | null {
     const room = this.getRoom(roomId);
     if (!room) return null;
@@ -220,7 +222,7 @@ export class MultiplayerRoomManager {
       serverPlayer = {
         id: player.id,
         name: player.name || `Racer ${room.players.size + 1}`,
-        avatar: player.avatar || '🚀',
+        avatar: player.avatar || '🏎️',
         isHost: room.players.size === 0,
         isReady: room.players.size === 0, // Host is ready by default
         connected: true,
@@ -248,8 +250,31 @@ export class MultiplayerRoomManager {
       serverPlayer.avatar = player.avatar || serverPlayer.avatar;
     }
 
-    room.connections.set(player.id, ws);
+    if (ws) {
+      room.connections.set(player.id, ws);
+    }
     return room;
+  }
+
+  public addSseListener(
+    roomId: string,
+    playerId: string,
+    callback: (event: any) => void
+  ) {
+    const room = this.getRoom(roomId);
+    if (!room) return;
+    room.eventListeners.set(playerId, callback);
+    const player = room.players.get(playerId);
+    if (player) {
+      player.connected = true;
+      player.lastHeartbeat = Date.now();
+    }
+  }
+
+  public removeSseListener(roomId: string, playerId: string) {
+    const room = this.getRoom(roomId);
+    if (!room) return;
+    room.eventListeners.delete(playerId);
   }
 
   public removeConnection(ws: WebSocket): { room: ServerRoom; playerId: string } | null {
@@ -468,14 +493,243 @@ export class MultiplayerRoomManager {
 
   public broadcastToRoom(room: ServerRoom, message: object) {
     const serialized = JSON.stringify(message);
+    
+    // Broadcast via WebSockets
     for (const [playerId, conn] of room.connections.entries()) {
       if (conn.readyState === 1 /* OPEN */) {
         try {
           conn.send(serialized);
         } catch (err) {
-          console.error(`Failed to send to player ${playerId}:`, err);
+          console.error(`Failed to send to WS player ${playerId}:`, err);
         }
       }
+    }
+
+    // Broadcast via SSE / Event Listeners
+    for (const [playerId, callback] of room.eventListeners.entries()) {
+      try {
+        callback(message);
+      } catch (err) {
+        console.error(`Failed to dispatch event to SSE listener ${playerId}:`, err);
+      }
+    }
+  }
+
+  public processAction(data: any, ws?: WebSocket): { success: boolean; response?: any; error?: string } {
+    try {
+      const { type } = data;
+
+      switch (type) {
+        case 'JOIN_LOBBY': {
+          const { roomId, player, language, format, isCreate } = data;
+          if (!roomId || !player?.id) {
+            return { success: false, error: 'Missing roomId or player information.' };
+          }
+
+          const currentRoomId = roomId.trim().toUpperCase();
+          let room = this.getRoom(currentRoomId);
+          if (!room) {
+            if (isCreate) {
+              room = this.createRoom(
+                currentRoomId,
+                player,
+                language || 'nepali',
+                format || 'single',
+                false
+              );
+            } else {
+              return {
+                success: false,
+                error: `Room "${currentRoomId}" not found. Please verify the code.`
+              };
+            }
+          }
+
+          this.addPlayerToRoom(currentRoomId, player, ws);
+          const lobbyPayload = this.serializeLobby(room);
+
+          this.broadcastToRoom(room, {
+            type: 'LOBBY_STATE',
+            room: lobbyPayload,
+            message: `${player.name} joined the arena.`
+          });
+
+          return { success: true, response: { type: 'LOBBY_STATE', room: lobbyPayload } };
+        }
+
+        case 'QUICK_MATCH': {
+          const { player, language } = data;
+          if (!player?.id) return { success: false, error: 'Missing player ID' };
+
+          const chosenLang = language || 'nepali';
+          let room = this.findPublicMatchmakingRoom(chosenLang, player.id);
+          if (!room) {
+            const newRoomCode = `PUB-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+            room = this.createRoom(newRoomCode, player, chosenLang, 'single', true);
+          }
+
+          this.addPlayerToRoom(room.roomId, player, ws);
+          const lobbyPayload = this.serializeLobby(room);
+
+          this.broadcastToRoom(room, {
+            type: 'LOBBY_STATE',
+            room: lobbyPayload,
+            message: `${player.name} joined the match.`
+          });
+
+          return { success: true, response: { type: 'LOBBY_STATE', room: lobbyPayload } };
+        }
+
+        case 'TOGGLE_READY': {
+          const { roomId, playerId, isReady } = data;
+          if (!roomId || !playerId) return { success: false, error: 'Missing roomId or playerId' };
+
+          const room = this.toggleReady(roomId, playerId, isReady);
+          if (room) {
+            const lobbyPayload = this.serializeLobby(room);
+            this.broadcastToRoom(room, {
+              type: 'LOBBY_STATE',
+              room: lobbyPayload
+            });
+            return { success: true, response: { type: 'LOBBY_STATE', room: lobbyPayload } };
+          }
+          return { success: false, error: 'Room not found' };
+        }
+
+        case 'UPDATE_SETTINGS': {
+          const { roomId, language, format } = data;
+          if (!roomId) return { success: false, error: 'Missing roomId' };
+
+          const room = this.updateRoomSettings(roomId, language, format);
+          if (room) {
+            const lobbyPayload = this.serializeLobby(room);
+            this.broadcastToRoom(room, {
+              type: 'LOBBY_STATE',
+              room: lobbyPayload
+            });
+            return { success: true, response: { type: 'LOBBY_STATE', room: lobbyPayload } };
+          }
+          return { success: false, error: 'Cannot update settings' };
+        }
+
+        case 'START_MATCH': {
+          const { roomId, countdownDurationMs } = data;
+          if (!roomId) return { success: false, error: 'Missing roomId' };
+
+          const room = this.startCountdown(roomId, countdownDurationMs || 4000);
+          if (room) {
+            const countdownData = {
+              type: 'MATCH_COUNTDOWN',
+              matchId: room.matchId,
+              startTimestamp: room.startTimestamp,
+              countdownDurationMs: room.countdownDurationMs,
+              targetText: room.targetText,
+              textId: room.textId,
+              textTitle: room.textTitle,
+              language: room.language,
+              currentRound: room.currentRound,
+              totalRounds: room.totalRounds,
+              players: Array.from(room.players.values())
+            };
+            this.broadcastToRoom(room, countdownData);
+            return { success: true, response: countdownData };
+          }
+          return { success: false, error: 'Failed to start match' };
+        }
+
+        case 'UPDATE_PROGRESS': {
+          const { roomId, playerId, progress, charsTyped, wordsTyped, accuracy, mistakes, isFinished } = data;
+          if (!roomId || !playerId) return { success: false, error: 'Missing roomId or playerId' };
+
+          const result = this.updatePlayerProgress(roomId, playerId, {
+            progress,
+            charsTyped,
+            wordsTyped,
+            accuracy,
+            mistakes,
+            isFinished
+          });
+
+          if (result) {
+            const { room, allFinished } = result;
+
+            this.broadcastToRoom(room, {
+              type: 'PLAYERS_PROGRESS_UPDATE',
+              matchId: room.matchId,
+              players: Array.from(room.players.values())
+            });
+
+            if (allFinished) {
+              this.broadcastToRoom(room, {
+                type: 'MATCH_FINISHED',
+                matchId: room.matchId,
+                results: room.results,
+                scores: room.scores,
+                currentRound: room.currentRound,
+                totalRounds: room.totalRounds
+              });
+            }
+            return { success: true };
+          }
+          return { success: false, error: 'Could not update progress' };
+        }
+
+        case 'NEXT_ROUND': {
+          const { roomId } = data;
+          if (!roomId) return { success: false, error: 'Missing roomId' };
+
+          const room = this.prepareNextRound(roomId);
+          if (room) {
+            const lobbyPayload = this.serializeLobby(room);
+            this.broadcastToRoom(room, {
+              type: 'LOBBY_STATE',
+              room: lobbyPayload
+            });
+            return { success: true, response: { type: 'LOBBY_STATE', room: lobbyPayload } };
+          }
+          return { success: false, error: 'Room not found' };
+        }
+
+        case 'HEARTBEAT': {
+          const { roomId, playerId } = data;
+          if (roomId && playerId) {
+            const room = this.getRoom(roomId);
+            if (room) {
+              const player = room.players.get(playerId);
+              if (player) {
+                player.lastHeartbeat = Date.now();
+                player.connected = true;
+              }
+            }
+          }
+          return { success: true, response: { type: 'HEARTBEAT_ACK', timestamp: Date.now() } };
+        }
+
+        case 'LEAVE_LOBBY': {
+          const { roomId, playerId } = data;
+          if (roomId) {
+            const room = this.getRoom(roomId);
+            if (room && playerId) {
+              const player = room.players.get(playerId);
+              if (player) {
+                player.connected = false;
+              }
+              this.broadcastToRoom(room, {
+                type: 'LOBBY_STATE',
+                room: this.serializeLobby(room),
+                message: `${player?.name || 'Player'} left the lobby.`
+              });
+            }
+          }
+          return { success: true };
+        }
+
+        default:
+          return { success: false, error: `Unknown action type: ${type}` };
+      }
+    } catch (err: any) {
+      console.error('Error executing action:', err);
+      return { success: false, error: err.message || 'Internal error' };
     }
   }
 

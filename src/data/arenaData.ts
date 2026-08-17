@@ -92,6 +92,13 @@ export const AVATAR_OPTIONS = [
   { id: 'phoenix-fire', name: 'Phoenix Flare', icon: '🔥', requiredLevel: 12, description: 'Resilient flame-powered mythic craft' }
 ];
 
+export function getAvatarIcon(avatarIdOrIcon?: string): string {
+  if (!avatarIdOrIcon) return '🏎️';
+  const found = AVATAR_OPTIONS.find((a) => a.id === avatarIdOrIcon);
+  if (found) return found.icon;
+  return avatarIdOrIcon;
+}
+
 export const TITLE_OPTIONS = [
   { id: 'Rookie Racer', name: 'Rookie Racer', minRating: 1000 },
   { id: 'Key Explorer', name: 'Key Explorer', minRating: 1100 },

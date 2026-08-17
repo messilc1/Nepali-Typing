@@ -1,5 +1,6 @@
 import React from 'react';
 import { Racer } from '../../types/arenaTypes';
+import { getAvatarIcon } from '../../data/arenaData';
 import { Flag, Zap, Shield, Sparkles, CheckCircle2 } from 'lucide-react';
 
 interface RaceTrackViewProps {
@@ -102,7 +103,7 @@ export const RaceTrackView: React.FC<RaceTrackViewProps> = ({
 
                   {/* Racer Name & Avatar Tag */}
                   <div className="flex items-center gap-1.5">
-                    <span className="text-base">{racer.avatar || (isUser ? '🏎️' : '🤖')}</span>
+                    <span className="text-base">{getAvatarIcon(racer.avatar || (isUser ? '🏎️' : '🤖'))}</span>
                     <span className={`font-bold truncate max-w-[140px] sm:max-w-[200px] ${
                       isUser ? 'text-blue-300 font-extrabold' : 'text-slate-200'
                     }`}>
@@ -185,7 +186,7 @@ export const RaceTrackView: React.FC<RaceTrackViewProps> = ({
                         : 'bg-slate-800 text-slate-200 border border-slate-700'
                     } ${isLeader ? 'animate-bounce' : ''}`}
                   >
-                    <span>{racer.avatar || (isUser ? '🏎️' : '🤖')}</span>
+                    <span>{getAvatarIcon(racer.avatar || (isUser ? '🏎️' : '🤖'))}</span>
                     {isLeader && (
                       <span className="absolute -top-2 -right-1 text-[10px]">👑</span>
                     )}

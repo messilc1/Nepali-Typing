@@ -18,7 +18,8 @@ import {
   getTierFromRating,
   calculateXpForNextLevel,
   AVATAR_OPTIONS,
-  TITLE_OPTIONS
+  TITLE_OPTIONS,
+  getAvatarIcon
 } from '../../data/arenaData';
 import {
   multiplayerSocket,
@@ -420,7 +421,7 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
             {/* Player Avatar & Identity */}
             <div className="flex items-center gap-4 text-center sm:text-left">
               <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-3xl bg-blue-950/90 border border-blue-700/80 flex items-center justify-center text-4xl shadow-xl shadow-blue-950/50 ring-2 ring-blue-500/30">
-                {profile.selectedAvatar === 'cyber-kart' ? '🏎️' : profile.selectedAvatar === 'himalayan-falcon' ? '🦅' : '🚀'}
+                {getAvatarIcon(profile.selectedAvatar)}
               </div>
 
               <div className="space-y-1">

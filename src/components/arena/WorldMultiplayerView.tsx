@@ -5,6 +5,7 @@ import {
   MultiplayerLobbyState,
   MultiplayerPlayer
 } from '../../types/arenaTypes';
+import { getAvatarIcon } from '../../data/arenaData';
 import {
   multiplayerSocket,
   SocketConnectionStatus,
@@ -123,7 +124,7 @@ export const WorldMultiplayerView: React.FC<WorldMultiplayerViewProps> = ({
       {
         id: playerId,
         name: displayName,
-        avatar: profile.selectedAvatar || '🏎️'
+        avatar: getAvatarIcon(profile.selectedAvatar)
       },
       language
     );
@@ -285,7 +286,7 @@ export const WorldMultiplayerView: React.FC<WorldMultiplayerViewProps> = ({
                   className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 flex items-center gap-3"
                 >
                   <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xl">
-                    {p.avatar || '🏎️'}
+                    {getAvatarIcon(p.avatar)}
                   </div>
                   <div className="truncate">
                     <div className="text-sm font-bold text-white truncate">{p.name}</div>

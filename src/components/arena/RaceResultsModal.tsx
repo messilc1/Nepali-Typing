@@ -5,6 +5,7 @@ import {
   CompetitiveDivision,
   OfficialMultiplayerResult
 } from '../../types/arenaTypes';
+import { getAvatarIcon } from '../../data/arenaData';
 import {
   Trophy,
   Award,
@@ -217,7 +218,7 @@ export const RaceResultsModal: React.FC<RaceResultsModalProps> = ({
                   >
                     <div className="flex items-center gap-2">
                       <span className="w-5 text-center font-bold text-slate-400">#{racer.rank || idx + 1}</span>
-                      <span className="text-base">{racer.avatar || '🏎️'}</span>
+                      <span className="text-base">{getAvatarIcon(racer.avatar || '🏎️')}</span>
                       <span className="truncate max-w-[150px] sm:max-w-[220px]">
                         {racer.name} {isUser && '(YOU)'}
                       </span>
