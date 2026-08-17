@@ -372,6 +372,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     wordErrorsListRef.current = [];
     charErrorsListRef.current = [];
 
+    if (textContainerRef.current) {
+      textContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
     onLiveStatsChange?.({
       grossWpm: 0,
       netWpm: 0,
@@ -1018,24 +1022,57 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     }
   };
 
-  // Smooth synchronized auto-scrolling: keeps active line at ~33% container height so 2-3 lines ahead remain visible
+  // Intelligent Automatic Vertical Scrolling Engine
+  // Keeps current typing line around ~32% from the top (upper-middle) so upcoming 2-3+ lines are always clearly visible.
   useEffect(() => {
-    if (activeWordRef.current && textContainerRef.current) {
-      const container = textContainerRef.current;
-      const wordEl = activeWordRef.current;
+    if (!textContainerRef.current || !activeWordRef.current) return;
 
-      const containerRect = container.getBoundingClientRect();
-      const wordRect = wordEl.getBoundingClientRect();
+    const container = textContainerRef.current;
+    const wordEl = activeWordRef.current;
 
-      const relativeTop = wordRect.top - containerRect.top + container.scrollTop;
-      const targetScrollTop = relativeTop - container.clientHeight * 0.33;
+    // wordEl.offsetTop is relative to textContainerRef because textContainerRef is position: relative
+    const wordTop = wordEl.offsetTop;
+    const containerHeight = container.clientHeight;
 
+    // Position current line at ~32% container height (keeps 1st/2nd lines at top, moves 3rd+ lines upward)
+    const targetLineOffset = containerHeight * 0.32;
+
+    let targetScrollTop = 0;
+    if (wordTop > targetLineOffset) {
+      targetScrollTop = wordTop - targetLineOffset;
+    }
+
+    const maxScroll = Math.max(0, container.scrollHeight - containerHeight);
+    const finalScrollTop = Math.min(targetScrollTop, maxScroll);
+
+    if (Math.abs(container.scrollTop - finalScrollTop) > 2) {
       container.scrollTo({
-        top: Math.max(0, targetScrollTop),
+        top: finalScrollTop,
         behavior: 'smooth'
       });
     }
-  }, [currentWordIndex, typedInput]);
+  }, [currentWordIndex, settings.fontSize, settings.fontFamily, targetText]);
+
+  // Window resize handler to maintain active line position
+  useEffect(() => {
+    const handleResize = () => {
+      if (!textContainerRef.current || !activeWordRef.current) return;
+      const container = textContainerRef.current;
+      const wordEl = activeWordRef.current;
+      const wordTop = wordEl.offsetTop;
+      const containerHeight = container.clientHeight;
+      const targetLineOffset = containerHeight * 0.32;
+      let targetScrollTop = 0;
+      if (wordTop > targetLineOffset) {
+        targetScrollTop = wordTop - targetLineOffset;
+      }
+      const maxScroll = Math.max(0, container.scrollHeight - containerHeight);
+      container.scrollTop = Math.min(targetScrollTop, maxScroll);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Compute font size class
   const getFontSizeClass = () => {
@@ -1351,7 +1388,12 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         {/* Text View Container */}
         <div
           ref={textContainerRef}
-          className={`w-full flex flex-wrap gap-x-3.5 gap-y-2.5 text-slate-400 dark:text-slate-500 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 py-4 scroll-smooth ${getFontSizeClass()}`}
+          onMouseDown={(e) => {
+            // Prevent loss of input focus when interacting with the text viewing area
+            e.preventDefault();
+            inputRef.current?.focus();
+          }}
+          className={`relative w-full flex flex-wrap gap-x-3.5 gap-y-2.5 text-slate-400 dark:text-slate-500 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 pt-2 pb-28 select-none focus:outline-none ${getFontSizeClass()}`}
           style={getFontFamilyStyle()}
         >
           {targetWords.map((word, wordIdx) => {

@@ -99,6 +99,10 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
   const lastKeyTimeRef = useRef<number>(Date.now());
   const timerIntervalRef = useRef<any>(null);
 
+  // Auto-scroll refs
+  const textContainerRef = useRef<HTMLDivElement>(null);
+  const activeCharRef = useRef<HTMLSpanElement>(null);
+
   // Detailed error trackers
   const mistypedWordsMapRef = useRef<Record<string, number>>({});
   const mistypedCharsMapRef = useRef<Record<string, number>>({});
