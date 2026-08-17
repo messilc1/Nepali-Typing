@@ -19,6 +19,7 @@ export interface LiveStats {
 export type NavigationTab = 'test' | 'english' | 'arena' | 'practice' | 'improvement' | 'legal' | 'analytics' | 'certification' | 'about';
 
 export * from './types/arenaTypes';
+export * from './utils/customTextAnalysis';
 
 export type LanguageMode = 'nepali' | 'english';
 
@@ -90,12 +91,32 @@ export interface TestSettings {
   sound: 'none' | 'click' | 'mechanical' | 'typewriter';
   soundVolume: number;
   showLiveWpm: boolean;
+  showNetWpm?: boolean;
+  showGrossWpm?: boolean;
   showLiveAccuracy: boolean;
   showKeyboard: boolean;
+  highlightNextKey?: boolean;
+  showFingerGuidance?: boolean;
+  showCurrentCharacter?: boolean;
+  showNextCharacter?: boolean;
   showMistakes: boolean;
   showTimer: boolean;
   showCursorTrail: boolean;
   showHints: boolean;
+  // Advanced Custom Text & Test Settings
+  mistakeMode?: 'strict' | 'allow';
+  maxMistakes?: number | null; // null = no limit, 5, 10, 20, or custom
+  maxMistakesAction?: 'end_test' | 'continue';
+  backspaceEnabled?: boolean;
+  noTimeLimit?: boolean;
+  customDurationSeconds?: number;
+  autoStartOnKeyPress?: boolean;
+  showCountdown?: boolean;
+  recordAnalytics?: boolean;
+  recordMistakes?: boolean;
+  recordCorrectedMistakes?: boolean;
+  lineSpacing?: 'normal' | 'relaxed' | 'loose';
+  textAreaSize?: 'compact' | 'standard' | 'spacious';
 }
 
 export interface KeyStats {

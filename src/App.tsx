@@ -15,6 +15,7 @@ import { EnglishTypingSection } from './components/english/EnglishTypingSection'
 import { TypingArenaHub } from './components/arena/TypingArenaHub';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
+import { CustomTextModal } from './components/CustomTextModal';
 
 import { TestSettings, TestResult, UserStats, KeyStats, LiveStats, NavigationTab } from './types';
 import { applyGlobalNepaliFont, getStoredNepaliFont } from './utils/fonts';
@@ -584,11 +585,25 @@ export default function App() {
       )}
 
       {showCustomParagraphModal && (
-        <CustomParagraphModal
-          onStartCustomTest={(text) => {
+        <CustomTextModal
+          initialLanguage={settings.language}
+          currentSettings={settings}
+          onStartCustomTest={(text, customSettings) => {
             setActivePassageTitle('Custom Practice Paragraph');
-            updateSettings({ testType: 'custom', customText: text });
-            setActiveTab('test');
+            updateSettings({
+              ...customSettings,
+              testType: 'custom',
+              customText: text
+            });
+            if (customSettings.language && customSettings.language !== settings.language) {
+              if (customSettings.language === 'english') {
+                setActiveTab('english');
+              } else {
+                setActiveTab('test');
+              }
+            } else {
+              setActiveTab('test');
+            }
             setActiveResult(null);
           }}
           onClose={() => setShowCustomParagraphModal(false)}

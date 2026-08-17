@@ -596,7 +596,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         }
 
         // Time-based test completion check
-        if (settings.testType === 'time' && settings.durationSeconds > 0) {
+        if (
+          ((settings.testType === 'time') || (settings.testType === 'custom' && !settings.noTimeLimit)) &&
+          settings.durationSeconds > 0
+        ) {
           if (seconds >= settings.durationSeconds) {
             finishTest(settings.durationSeconds);
           }
@@ -606,7 +609,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isTestRunning, isTestFinished, startTime, settings.testType, settings.durationSeconds, computeLiveStats, finishTest, onLiveStatsChange, emitLiveSession]);
+  }, [isTestRunning, isTestFinished, startTime, settings.testType, settings.durationSeconds, settings.noTimeLimit, computeLiveStats, finishTest, onLiveStatsChange, emitLiveSession]);
 
   const handleLocalRestart = useCallback(() => {
     if (isTestRunningRef.current) {
@@ -642,6 +645,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
     // Handle Backspace
     if (e.key === 'Backspace') {
+      if (settings.backspaceEnabled === false) {
+        e.preventDefault();
+        return;
+      }
       setBackspacesCount(prev => {
         const next = prev + 1;
         backspacesCountRef.current = next;
@@ -899,6 +906,13 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         onKeypressMetric(e.key.toLowerCase(), false, latency);
         onLiveStatsChange?.(computeLiveStats());
+
+        // Check if max mistakes limit reached
+        if (settings.maxMistakes && (mistakesCountRef.current) >= settings.maxMistakes && settings.maxMistakesAction === 'end_test') {
+          finishTest();
+          return;
+        }
+
         return;
       }
 

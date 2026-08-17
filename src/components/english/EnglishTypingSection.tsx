@@ -22,6 +22,8 @@ import {
   generateProgressiveEnglishDrills
 } from '../../utils/englishImprovementEngine';
 import { EnglishTypingPlayer } from './EnglishTypingPlayer';
+import { CustomTextModal } from '../CustomTextModal';
+import { TestSettings } from '../../types';
 import {
   LayoutDashboard,
   GraduationCap,
@@ -76,7 +78,15 @@ export const EnglishTypingSection: React.FC<EnglishTypingSectionProps> = ({
     timeLimitSeconds?: number;
     wordLimit?: number;
     customText?: string;
+    mistakeMode?: 'strict' | 'allow';
+    maxMistakes?: number | null;
+    maxMistakesAction?: 'end_test' | 'continue';
+    backspaceEnabled?: boolean;
+    noTimeLimit?: boolean;
+    showHints?: boolean;
   } | null>(null);
+
+  const [showCustomStudio, setShowCustomStudio] = useState<boolean>(false);
 
   // User Course Progression State
   const [courseProgress, setCourseProgress] = useState<EnglishUserProgress>(() => {
@@ -214,6 +224,12 @@ export const EnglishTypingSection: React.FC<EnglishTypingSectionProps> = ({
         timeLimitSeconds={activePlayerMode.timeLimitSeconds}
         wordLimit={activePlayerMode.wordLimit}
         customText={activePlayerMode.customText}
+        mistakeMode={activePlayerMode.mistakeMode}
+        maxMistakes={activePlayerMode.maxMistakes}
+        maxMistakesAction={activePlayerMode.maxMistakesAction}
+        backspaceEnabled={activePlayerMode.backspaceEnabled}
+        noTimeLimit={activePlayerMode.noTimeLimit}
+        showHints={activePlayerMode.showHints}
         onComplete={handlePlayerComplete}
         onExit={() => setActivePlayerMode(null)}
         onNextLesson={
@@ -871,13 +887,25 @@ export const EnglishTypingSection: React.FC<EnglishTypingSectionProps> = ({
 
           {/* Custom Text Option */}
           <div className="bg-white dark:bg-slate-800/90 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <span>Custom Text Typing Test</span>
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Paste your own English article, code comments, or document to practice typing custom content.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <span>Custom Text Typing Test</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Paste your own English article, code comments, or document to practice typing custom content.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowCustomStudio(true)}
+                className="px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 font-extrabold text-xs border border-blue-200 dark:border-blue-800 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Advanced Custom Studio</span>
+              </button>
+            </div>
 
             <textarea
               rows={3}
@@ -887,24 +915,37 @@ export const EnglishTypingSection: React.FC<EnglishTypingSectionProps> = ({
               className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
 
-            <div className="flex justify-end">
-              <button
-                disabled={!customTextDraft.trim()}
-                onClick={() => {
-                  setActivePlayerMode({
-                    type: 'paragraph-test',
-                    customText: customTextDraft
-                  });
-                }}
-                className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer ${
-                  customTextDraft.trim()
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Start Custom Test</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-slate-400">
+                {customTextDraft.trim().length > 0 ? `${customTextDraft.trim().split(/\s+/).length} words • ${customTextDraft.length} chars` : 'Enter text to start'}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCustomStudio(true)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Configure Full Test</span>
+                </button>
+                <button
+                  disabled={!customTextDraft.trim()}
+                  onClick={() => {
+                    setActivePlayerMode({
+                      type: 'paragraph-test',
+                      customText: customTextDraft
+                    });
+                  }}
+                  className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer ${
+                    customTextDraft.trim()
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Quick Start</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1010,6 +1051,56 @@ export const EnglishTypingSection: React.FC<EnglishTypingSectionProps> = ({
           )}
 
         </div>
+      )}
+
+      {showCustomStudio && (
+        <CustomTextModal
+          initialLanguage="english"
+          currentSettings={{
+            language: 'english',
+            testType: 'custom',
+            durationSeconds: 60,
+            noTimeLimit: false,
+            mistakeMode: 'strict',
+            maxMistakes: null,
+            maxMistakesAction: 'continue',
+            backspaceEnabled: true,
+            showHints: true,
+            showKeyboard: true,
+            highlightNextKey: true,
+            showFingerGuidance: true,
+            showCurrentCharacter: true,
+            showNextCharacter: true,
+            showLiveWpm: true,
+            showNetWpm: true,
+            showGrossWpm: true,
+            showLiveAccuracy: true,
+            sound: 'click',
+            soundVolume: 0.5,
+            showMistakes: true,
+            showTimer: true,
+            showCursorTrail: true,
+            difficulty: 'medium',
+            fontSize: 'md',
+            fontFamily: 'system-ui',
+            layout: 'traditional'
+          }}
+          onStartCustomTest={(text, customSettings) => {
+            setActivePlayerMode({
+              type: 'paragraph-test',
+              customText: text,
+              timeLimitSeconds: customSettings.durationSeconds,
+              noTimeLimit: customSettings.noTimeLimit,
+              mistakeMode: customSettings.mistakeMode,
+              maxMistakes: customSettings.maxMistakes,
+              maxMistakesAction: customSettings.maxMistakesAction,
+              backspaceEnabled: customSettings.backspaceEnabled,
+              showHints: customSettings.showHints
+            });
+            setShowCustomStudio(false);
+          }}
+          onClose={() => setShowCustomStudio(false)}
+        />
       )}
 
     </div>

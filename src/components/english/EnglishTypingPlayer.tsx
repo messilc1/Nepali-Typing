@@ -38,6 +38,12 @@ interface EnglishTypingPlayerProps {
   timeLimitSeconds?: number;
   wordLimit?: number;
   customText?: string;
+  mistakeMode?: 'strict' | 'allow';
+  maxMistakes?: number | null;
+  maxMistakesAction?: 'end_test' | 'continue';
+  backspaceEnabled?: boolean;
+  noTimeLimit?: boolean;
+  showHints?: boolean;
   onComplete: (result: TestResult, passedLesson?: boolean, stars?: number) => void;
   onExit: () => void;
   onNextLesson?: () => void;
@@ -52,6 +58,12 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
   timeLimitSeconds,
   wordLimit,
   customText,
+  mistakeMode = 'strict',
+  maxMistakes = null,
+  maxMistakesAction = 'continue',
+  backspaceEnabled = true,
+  noTimeLimit = false,
+  showHints = true,
   onComplete,
   onExit,
   onNextLesson
@@ -131,27 +143,6 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
   // Current and next expected characters
   const currentTargetChar = currentIndex < targetChars.length ? targetChars[currentIndex] : '';
   const nextTargetChar = currentIndex + 1 < targetChars.length ? targetChars[currentIndex + 1] : '';
-
-  // Timer effect
-  useEffect(() => {
-    if (hasStarted && !isFinished) {
-      startTimeRef.current = startTimeRef.current || Date.now();
-      timerIntervalRef.current = setInterval(() => {
-        const seconds = Math.floor((Date.now() - (startTimeRef.current || Date.now())) / 1000);
-        setElapsedSeconds(seconds);
-
-        // Check time limit
-        if (timeLimitSeconds && seconds >= timeLimitSeconds) {
-          finishSession();
-        }
-      }, 250);
-    } else {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    }
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    };
-  }, [hasStarted, isFinished, timeLimitSeconds]);
 
   // Calculate live metrics
   const liveStats = useMemo(() => {
@@ -245,6 +236,27 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     onComplete(testResult, passed, stars);
   }, [elapsedSeconds, typedChars, mistakeCount, backspaceCount, lesson, paragraphTest, practiceModule, improvementDrill, modeType, onComplete]);
 
+  // Timer effect
+  useEffect(() => {
+    if (hasStarted && !isFinished) {
+      startTimeRef.current = startTimeRef.current || Date.now();
+      timerIntervalRef.current = setInterval(() => {
+        const seconds = Math.floor((Date.now() - (startTimeRef.current || Date.now())) / 1000);
+        setElapsedSeconds(seconds);
+
+        // Check time limit
+        if (!noTimeLimit && timeLimitSeconds && timeLimitSeconds > 0 && seconds >= timeLimitSeconds) {
+          finishSession();
+        }
+      }, 250);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [hasStarted, isFinished, timeLimitSeconds, noTimeLimit, finishSession]);
+
   // Keydown handler
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (isFinished) return;
@@ -273,6 +285,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     // Handle Backspace
     if (e.key === 'Backspace') {
       e.preventDefault();
+      if (!backspaceEnabled) return;
       setBackspaceCount(prev => prev + 1);
       if (currentIndex > 0) {
         setCurrentIndex(prev => prev - 1);
@@ -314,25 +327,47 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
           finishSession();
         }
       } else {
-        // Mistake Keystroke (Strict Rule: do not advance on error)
+        // Mistake Keystroke
         existingKeyStat.mistakes += 1;
         keyStatsMapRef.current[lowerKey] = existingKeyStat;
 
-        setMistakeCount(prev => prev + 1);
+        const newMistakeCount = mistakeCount + 1;
+        setMistakeCount(newMistakeCount);
         playClickSound(true);
 
         // Log mistyped character
         mistypedCharsMapRef.current[expectedChar] = (mistypedCharsMapRef.current[expectedChar] || 0) + 1;
 
         detailedCharErrorsRef.current.push({
-          expectedChar,
+          targetChar: expectedChar,
           typedChar: e.key,
-          timestamp: now,
-          position: currentIndex
+          frequency: 1,
+          targetWord: '',
+          position: currentIndex,
+          corrected: false,
+          correctionMethod: 'None',
+          timestamp: now
         });
+
+        // Check max mistakes limit
+        if (maxMistakes && newMistakeCount >= maxMistakes && maxMistakesAction === 'end_test') {
+          finishSession();
+          return;
+        }
+
+        // In 'allow' mode, advance cursor with mistake recorded
+        if (mistakeMode === 'allow') {
+          setTypedChars(prev => [...prev, { char: e.key, isCorrect: false }]);
+          const nextIdx = currentIndex + 1;
+          setCurrentIndex(nextIdx);
+
+          if (nextIdx >= targetChars.length) {
+            finishSession();
+          }
+        }
       }
     }
-  }, [isFinished, hasStarted, currentIndex, targetChars, playClickSound, finishSession]);
+  }, [isFinished, hasStarted, currentIndex, targetChars, playClickSound, finishSession, backspaceEnabled, mistakeCount, maxMistakes, maxMistakesAction, mistakeMode]);
 
   // Attach global keyboard listener
   useEffect(() => {
