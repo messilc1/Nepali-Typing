@@ -3,11 +3,12 @@
  * Enforces character-by-character validation across all typing modes and tabs.
  * 
  * Rules:
- * 1. An incorrect character is NEVER inserted into visible typed text.
- * 2. An incorrect character NEVER advances the cursor or word index.
+ * 1. An incorrect character is NEVER inserted into visible typed text in strict mode.
+ * 2. An incorrect character NEVER advances the cursor or word index in strict mode.
  * 3. Every wrong keypress is recorded for accuracy and analytics.
  * 4. The user MUST correct the current character before proceeding.
  * 5. Full support for Devanagari Romanized Unicode (matras, half-letters, conjuncts, dictionary, numbers, punctuation).
+ * 6. Guarantees that typing NEVER locks or freezes on any character, punctuation, quote, or space.
  */
 
 import {
@@ -15,6 +16,11 @@ import {
   transliterateWordRuleBased,
   COMMON_DICTIONARY
 } from './nepaliTransliteration';
+import {
+  isCharacterEquivalent,
+  areDevanagariWordsEquivalent,
+  stripInvisibleCharacters
+} from './textNormalizer';
 
 export interface StrictValidationResult {
   isValid: boolean;
@@ -37,18 +43,25 @@ export function getNextExpectedKey(
 ): string {
   if (!targetWord) return '';
 
+  const cleanTarget = stripInvisibleCharacters(targetWord);
+  const cleanConverted = stripInvisibleCharacters(currentConverted);
+
   if (language === 'english') {
-    if (currentBuffer.length < targetWord.length) {
-      return targetWord[currentBuffer.length];
+    if (currentBuffer.length < cleanTarget.length) {
+      return cleanTarget[currentBuffer.length];
     }
     return ' '; // Word is complete, expecting Space to commit
   }
 
   // Nepali Language Mode
-  const targetRoman = getRomanizedHintForWord(targetWord);
+  const targetRoman = getRomanizedHintForWord(cleanTarget);
   
   // Check if word is already completely transliterated or matching target
-  if (currentConverted === targetWord || (targetRoman && currentBuffer === targetRoman)) {
+  if (
+    cleanConverted === cleanTarget ||
+    areDevanagariWordsEquivalent(cleanConverted, cleanTarget) ||
+    (targetRoman && currentBuffer.toLowerCase() === targetRoman.toLowerCase())
+  ) {
     return ' '; // Word complete, expecting Space to commit
   }
 
@@ -80,10 +93,17 @@ export function validateStrictKeystroke(params: {
     isLastWord = false
   } = params;
 
-  // Handle Space key
-  if (pressedKey === ' ' || pressedKey === 'Space') {
+  const cleanTarget = stripInvisibleCharacters(targetWord);
+  const cleanConverted = stripInvisibleCharacters(currentConverted);
+
+  // Handle Space or Enter key -> Word Completion Check
+  if (pressedKey === ' ' || pressedKey === 'Space' || pressedKey === 'Enter') {
     if (language === 'english') {
-      const isComplete = currentBuffer === targetWord;
+      const isComplete =
+        currentBuffer === cleanTarget ||
+        currentBuffer.toLowerCase() === cleanTarget.toLowerCase() ||
+        isCharacterEquivalent(currentBuffer, cleanTarget);
+
       if (isComplete) {
         return {
           isValid: true,
@@ -99,14 +119,20 @@ export function validateStrictKeystroke(params: {
         newBuffer: currentBuffer,
         newConverted: currentConverted,
         isWordComplete: false,
-        expectedKey: targetWord[currentBuffer.length] || '',
+        expectedKey: cleanTarget[currentBuffer.length] || '',
         isSpaceKey: false,
         errorKey: ' '
       };
     } else {
-      // Nepali Space
-      const targetRoman = getRomanizedHintForWord(targetWord);
-      const isComplete = currentConverted === targetWord || currentBuffer === targetRoman;
+      // Nepali Space Validation
+      const targetRoman = getRomanizedHintForWord(cleanTarget);
+      const isComplete =
+        cleanConverted === cleanTarget ||
+        areDevanagariWordsEquivalent(cleanConverted, cleanTarget) ||
+        currentBuffer.toLowerCase() === targetRoman.toLowerCase() ||
+        (currentBuffer.length >= targetRoman.length && targetRoman.length > 0) ||
+        (cleanConverted.length >= cleanTarget.length && cleanTarget.length > 0);
+
       if (isComplete) {
         return {
           isValid: true,
@@ -122,7 +148,7 @@ export function validateStrictKeystroke(params: {
         newBuffer: currentBuffer,
         newConverted: currentConverted,
         isWordComplete: false,
-        expectedKey: targetRoman[currentBuffer.length] || '',
+        expectedKey: targetRoman[currentBuffer.length] || cleanTarget[cleanConverted.length] || ' ',
         isSpaceKey: false,
         errorKey: ' '
       };
@@ -131,7 +157,7 @@ export function validateStrictKeystroke(params: {
 
   // English character validation
   if (language === 'english') {
-    if (currentBuffer.length >= targetWord.length) {
+    if (currentBuffer.length >= cleanTarget.length) {
       // Word is already full, user must press space (unless it's the last word)
       return {
         isValid: false,
@@ -144,11 +170,13 @@ export function validateStrictKeystroke(params: {
       };
     }
 
-    const expected = targetWord[currentBuffer.length];
-    if (pressedKey === expected) {
-      const newBuf = currentBuffer + pressedKey;
-      const isComplete = newBuf === targetWord;
-      const nextExp = isComplete ? (isLastWord ? '' : ' ') : targetWord[newBuf.length] || '';
+    const expected = cleanTarget[currentBuffer.length];
+    const isMatched = isCharacterEquivalent(pressedKey, expected);
+
+    if (isMatched) {
+      const newBuf = currentBuffer + expected;
+      const isComplete = newBuf.length === cleanTarget.length;
+      const nextExp = isComplete ? (isLastWord ? '' : ' ') : cleanTarget[newBuf.length] || '';
 
       return {
         isValid: true,
@@ -173,11 +201,14 @@ export function validateStrictKeystroke(params: {
   }
 
   // Nepali character validation
-  const targetRoman = getRomanizedHintForWord(targetWord);
+  const targetRoman = getRomanizedHintForWord(cleanTarget);
   const expectedChar = targetRoman[currentBuffer.length] || '';
 
   // If current word is already finished, reject non-space
-  if (currentConverted === targetWord && !isLastWord) {
+  if (
+    (cleanConverted === cleanTarget || areDevanagariWordsEquivalent(cleanConverted, cleanTarget)) &&
+    !isLastWord
+  ) {
     return {
       isValid: false,
       newBuffer: currentBuffer,
@@ -193,24 +224,40 @@ export function validateStrictKeystroke(params: {
   const candidateConverted = transliterateWordRuleBased(candidateBuffer);
 
   // Validation conditions:
-  // 1. Direct character match with targetRoman hint
+  // 1. Direct character match with targetRoman hint (including case-insensitivity or character equivalence)
   // 2. Candidate buffer is a prefix of targetRoman
-  // 3. Candidate converted is exact match with targetWord
-  // 4. Candidate converted (or without trailing virama) is a valid prefix of targetWord
-  const isDirectMatch = pressedKey === expectedChar;
-  const isBufferPrefix = targetRoman.startsWith(candidateBuffer);
-  const isExactWordMatch = candidateConverted === targetWord;
-  const isConvertedPrefix =
-    targetWord.startsWith(candidateConverted) ||
-    targetWord.startsWith(candidateConverted.replace(/्$/, ''));
+  // 3. Candidate converted is exact match with cleanTarget
+  // 4. Candidate converted (or without trailing virama) is a valid prefix of cleanTarget
+  // 5. Direct match with expected Devanagari character (for direct Nepali key inputs)
+  const isDirectMatch =
+    pressedKey === expectedChar ||
+    isCharacterEquivalent(pressedKey, expectedChar) ||
+    pressedKey.toLowerCase() === expectedChar.toLowerCase();
 
-  const isValid = isDirectMatch || isBufferPrefix || isExactWordMatch || isConvertedPrefix;
+  const isBufferPrefix =
+    targetRoman.toLowerCase().startsWith(candidateBuffer.toLowerCase()) ||
+    targetRoman.startsWith(candidateBuffer);
+
+  const isExactWordMatch =
+    candidateConverted === cleanTarget ||
+    areDevanagariWordsEquivalent(candidateConverted, cleanTarget);
+
+  const isConvertedPrefix =
+    cleanTarget.startsWith(candidateConverted) ||
+    cleanTarget.startsWith(candidateConverted.replace(/्$/, '')) ||
+    candidateConverted.startsWith(cleanTarget.replace(/्$/, ''));
+
+  // Allow punctuation or direct character match at end of word
+  const isPunctuationMatch =
+    isCharacterEquivalent(pressedKey, cleanTarget[cleanTarget.length - 1] || '');
+
+  const isValid = isDirectMatch || isBufferPrefix || isExactWordMatch || isConvertedPrefix || isPunctuationMatch;
 
   if (isValid) {
-    const isComplete = isExactWordMatch || candidateBuffer === targetRoman;
+    const isComplete = isExactWordMatch || candidateBuffer.toLowerCase() === targetRoman.toLowerCase();
     const nextExpected = isComplete
       ? (isLastWord ? '' : ' ')
-      : targetRoman[candidateBuffer.length] || '';
+      : targetRoman[candidateBuffer.length] || ' ';
 
     return {
       isValid: true,
@@ -228,7 +275,7 @@ export function validateStrictKeystroke(params: {
     newBuffer: currentBuffer,
     newConverted: currentConverted,
     isWordComplete: false,
-    expectedKey: expectedChar || targetRoman[currentBuffer.length] || '',
+    expectedKey: expectedChar || targetRoman[currentBuffer.length] || cleanTarget[cleanConverted.length] || '',
     isSpaceKey: false,
     errorKey: pressedKey
   };

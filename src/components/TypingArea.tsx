@@ -18,6 +18,7 @@ import { transliterateWordRuleBased, getWordSuggestions, getRomanizedHintForWord
 import { validateStrictKeystroke, getNextExpectedKey } from '../utils/strictTypingEngine';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
+import { extractSanitizedWords, areDevanagariWordsEquivalent, isCharacterEquivalent } from '../utils/textNormalizer';
 
 interface TypingAreaProps {
   settings: TestSettings;
@@ -102,7 +103,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const textContainerRef = useRef<HTMLDivElement>(null);
 
-  const targetWords = useMemo(() => targetText.trim().split(/\s+/).filter(Boolean), [targetText]);
+  const targetWords = useMemo(() => extractSanitizedWords(targetText), [targetText]);
 
   // Compute live statistics helper
   const computeLiveStats = useCallback((overrideElapsedSec?: number): LiveStats => {
@@ -720,7 +721,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         isLastWord
       });
 
-      if (!validation.isValid) {
+      if (settings.mistakeMode === 'strict' && !validation.isValid) {
         // Space REJECTED: User must finish typing the current word correctly first!
         playErrorSound(settings.soundVolume);
         setMistakesCount(prev => {
@@ -771,11 +772,26 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         return;
       }
 
-      // Space ACCEPTED: Current word is completely matched -> commit word!
-      playKeypressSound(settings.sound, settings.soundVolume);
+      // Space ACCEPTED (either strict matched or allow mode commit)
+      const committedWord = (settings.language === 'nepali' ? (typedInput || currentBuf) : currentBuf) || currentTargetWord;
+      const isWordCorrect = committedWord === currentTargetWord || areDevanagariWordsEquivalent(committedWord, currentTargetWord);
+
+      if (!isWordCorrect && settings.mistakeMode === 'allow') {
+        playErrorSound(settings.soundVolume);
+        setMistakesCount(prev => {
+          const next = prev + 1;
+          mistakesCountRef.current = next;
+          return next;
+        });
+        currentWordMistakesRef.current++;
+        mistypedWordsRef.current[currentTargetWord] = (mistypedWordsRef.current[currentTargetWord] || 0) + 1;
+      } else {
+        playKeypressSound(settings.sound, settings.soundVolume);
+      }
+
       setKeystrokes(prev => prev + 1);
       setRejectedKeyInfo(null);
-      onKeypressMetric('space', true, latency);
+      onKeypressMetric('space', isWordCorrect, latency);
 
       // If user made mistakes on this word and corrected it with Backspace, record the DetailedWordError
       if (currentWordMistakesRef.current > 0) {
@@ -784,9 +800,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         
         wordErrorsListRef.current.push({
           targetWord: currentTargetWord,
-          typedWord: currentWordMistypedSnapshotRef.current || currentTargetWord,
+          typedWord: committedWord || currentWordMistypedSnapshotRef.current || currentTargetWord,
           mistakes: currentWordMistakesRef.current,
-          corrected: true,
+          corrected: isWordCorrect,
           timeSpentMs: timeSpentOnWord,
           backspacesUsed: currentWordBackspacesRef.current,
           correctionMethod: currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None',
@@ -798,7 +814,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         // Mark character errors as corrected
         charErrorsListRef.current.forEach(cErr => {
           if (cErr.targetWord === currentTargetWord) {
-            cErr.corrected = true;
+            cErr.corrected = isWordCorrect;
             cErr.correctionMethod = currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None';
             if (!cErr.correctionTimeMs && currentWordErrorStartRef.current) {
               cErr.correctionTimeMs = Date.now() - currentWordErrorStartRef.current;
@@ -814,7 +830,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       currentWordStartTimeRef.current = Date.now();
       currentWordErrorStartRef.current = null;
 
-      const nextHistory = [...typedHistory, currentTargetWord];
+      const nextHistory = [...typedHistory, committedWord];
       typedHistoryRef.current = nextHistory;
       setTypedHistory(nextHistory);
 
@@ -852,7 +868,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       });
 
       if (!validation.isValid) {
-        // Character REJECTED: Do NOT insert into typed text, do NOT advance cursor!
+        // Character REJECTED
         playErrorSound(settings.soundVolume);
         setMistakesCount(prev => {
           const next = prev + 1;
@@ -907,78 +923,97 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         onKeypressMetric(e.key.toLowerCase(), false, latency);
         onLiveStatsChange?.(computeLiveStats());
 
+        // In allow mode, allow character to be appended anyway
+        if (settings.mistakeMode === 'allow') {
+          if (settings.language === 'nepali') {
+            const nextBuf = currentBuf + e.key;
+            const converted = transliterateWordRuleBased(nextBuf);
+            setRomanBuffer(nextBuf);
+            setTypedInput(converted);
+            typedInputRef.current = converted;
+          } else {
+            const nextBuf = currentBuf + e.key;
+            setTypedInput(nextBuf);
+            typedInputRef.current = nextBuf;
+          }
+        }
+
         // Check if max mistakes limit reached
         if (settings.maxMistakes && (mistakesCountRef.current) >= settings.maxMistakes && settings.maxMistakesAction === 'end_test') {
           finishTest();
           return;
         }
 
-        return;
+        if (settings.mistakeMode === 'strict') {
+          return;
+        }
       }
 
       // Character ACCEPTED: Valid input according to Romanized Nepali / English rules!
-      playKeypressSound(settings.sound, settings.soundVolume);
-      setKeystrokes(prev => prev + 1);
-      setRejectedKeyInfo(null);
+      if (validation.isValid) {
+        playKeypressSound(settings.sound, settings.soundVolume);
+        setKeystrokes(prev => prev + 1);
+        setRejectedKeyInfo(null);
 
-      if (settings.language === 'nepali') {
-        setRomanBuffer(validation.newBuffer);
-        setTypedInput(validation.newConverted);
-        typedInputRef.current = validation.newConverted;
-        setActiveSuggestions(getWordSuggestions(validation.newBuffer));
-      } else {
-        setTypedInput(validation.newBuffer);
-        typedInputRef.current = validation.newBuffer;
-      }
-
-      onKeypressMetric(e.key.toLowerCase(), true, latency);
-      onLiveStatsChange?.(computeLiveStats());
-      emitLiveSession('Abandoned');
-
-      // Auto-complete if last word of the test is complete
-      if (isLastWord && validation.isWordComplete) {
-        if (currentWordMistakesRef.current > 0) {
-          const timeSpentOnWord = currentWordStartTimeRef.current ? (Date.now() - currentWordStartTimeRef.current) : 1000;
-          const correctionTime = currentWordErrorStartRef.current ? (Date.now() - currentWordErrorStartRef.current) : 0;
-          
-          wordErrorsListRef.current.push({
-            targetWord: currentTargetWord,
-            typedWord: currentWordMistypedSnapshotRef.current || currentTargetWord,
-            mistakes: currentWordMistakesRef.current,
-            corrected: true,
-            timeSpentMs: timeSpentOnWord,
-            backspacesUsed: currentWordBackspacesRef.current,
-            correctionMethod: currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None',
-            correctionTimeMs: correctionTime,
-            errorPosition: 0,
-            timestamp: Date.now()
-          });
-
-          charErrorsListRef.current.forEach(cErr => {
-            if (cErr.targetWord === currentTargetWord) {
-              cErr.corrected = true;
-              cErr.correctionMethod = currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None';
-              if (!cErr.correctionTimeMs && currentWordErrorStartRef.current) {
-                cErr.correctionTimeMs = Date.now() - currentWordErrorStartRef.current;
-              }
-            }
-          });
+        if (settings.language === 'nepali') {
+          setRomanBuffer(validation.newBuffer);
+          setTypedInput(validation.newConverted);
+          typedInputRef.current = validation.newConverted;
+          setActiveSuggestions(getWordSuggestions(validation.newBuffer));
+        } else {
+          setTypedInput(validation.newBuffer);
+          typedInputRef.current = validation.newBuffer;
         }
 
-        const nextHistory = [...typedHistory, currentTargetWord];
-        typedHistoryRef.current = nextHistory;
-        setTypedHistory(nextHistory);
+        onKeypressMetric(e.key.toLowerCase(), true, latency);
+        onLiveStatsChange?.(computeLiveStats());
+        emitLiveSession('Abandoned');
 
-        const nextWordIdx = currentWordIndex + 1;
-        currentWordIndexRef.current = nextWordIdx;
-        setCurrentWordIndex(nextWordIdx);
+        // Auto-complete if last word of the test is complete
+        if (isLastWord && validation.isWordComplete) {
+          if (currentWordMistakesRef.current > 0) {
+            const timeSpentOnWord = currentWordStartTimeRef.current ? (Date.now() - currentWordStartTimeRef.current) : 1000;
+            const correctionTime = currentWordErrorStartRef.current ? (Date.now() - currentWordErrorStartRef.current) : 0;
+            
+            wordErrorsListRef.current.push({
+              targetWord: currentTargetWord,
+              typedWord: currentWordMistypedSnapshotRef.current || currentTargetWord,
+              mistakes: currentWordMistakesRef.current,
+              corrected: true,
+              timeSpentMs: timeSpentOnWord,
+              backspacesUsed: currentWordBackspacesRef.current,
+              correctionMethod: currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None',
+              correctionTimeMs: correctionTime,
+              errorPosition: 0,
+              timestamp: Date.now()
+            });
 
-        setTypedInput('');
-        typedInputRef.current = '';
-        setRomanBuffer('');
+            charErrorsListRef.current.forEach(cErr => {
+              if (cErr.targetWord === currentTargetWord) {
+                cErr.corrected = true;
+                cErr.correctionMethod = currentWordBackspacesRef.current > 0 ? 'Backspace' : 'None';
+                if (!cErr.correctionTimeMs && currentWordErrorStartRef.current) {
+                  cErr.correctionTimeMs = Date.now() - currentWordErrorStartRef.current;
+                }
+              }
+            });
+          }
 
-        finishTest();
-        return;
+          const nextHistory = [...typedHistory, currentTargetWord];
+          typedHistoryRef.current = nextHistory;
+          setTypedHistory(nextHistory);
+
+          const nextWordIdx = currentWordIndex + 1;
+          currentWordIndexRef.current = nextWordIdx;
+          setCurrentWordIndex(nextWordIdx);
+
+          setTypedInput('');
+          typedInputRef.current = '';
+          setRomanBuffer('');
+
+          finishTest();
+          return;
+        }
       }
     }
   };
@@ -1021,18 +1056,18 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   return (
     <div id="typing-area-container" className="w-full flex flex-col items-center gap-4">
       
-      {/* Test Control Header Options */}
-      <div className="w-full flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      {/* Test Control Header Options - Clean Segmented Bar */}
+      <div className="w-full flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
         
-        {/* Mode Selector */}
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+        {/* Mode Selector Group */}
+        <div className="flex flex-wrap items-center gap-1 bg-slate-100/70 dark:bg-slate-800/60 p-1 rounded-lg border border-slate-200/50 dark:border-slate-700/50 text-xs">
           
           <button
             onClick={() => updateSettings({ testType: 'time' })}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
               settings.testType === 'time'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -1041,10 +1076,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
           <button
             onClick={() => updateSettings({ testType: 'words' })}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
               settings.testType === 'words'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Type className="w-3.5 h-3.5" />
@@ -1053,10 +1088,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
           <button
             onClick={onOpenCustomParagraph}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
               settings.testType === 'custom'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
@@ -1065,10 +1100,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
           <button
             onClick={() => updateSettings({ testType: 'legal' })}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
               settings.testType === 'legal'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Scale className="w-3.5 h-3.5" />
@@ -1077,10 +1112,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
           <button
             onClick={() => updateSettings({ testType: 'quote' })}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors cursor-pointer ${
               settings.testType === 'quote'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Quote className="w-3.5 h-3.5" />
@@ -1089,18 +1124,18 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         </div>
 
-        {/* Duration / Word Count Options Sub-Pills */}
-        <div className="flex items-center gap-2 text-xs">
+        {/* Options & Action Controls */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           {settings.testType === 'time' && (
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
+            <div className="flex items-center gap-0.5 bg-slate-100/70 dark:bg-slate-800/60 p-1 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
               {[15, 30, 60, 120, 180, 300, 600].map(sec => (
                 <button
                   key={sec}
                   onClick={() => updateSettings({ durationSeconds: sec })}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  className={`px-2 py-1 rounded-md font-medium transition-colors cursor-pointer ${
                     settings.durationSeconds === sec
-                      ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   {sec >= 60 ? `${sec / 60}m` : `${sec}s`}
@@ -1110,15 +1145,15 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           )}
 
           {settings.testType === 'words' && (
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
+            <div className="flex items-center gap-0.5 bg-slate-100/70 dark:bg-slate-800/60 p-1 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
               {[10, 25, 50, 100, 250].map(cnt => (
                 <button
                   key={cnt}
                   onClick={() => updateSettings({ wordCount: cnt })}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  className={`px-2 py-1 rounded-md font-medium transition-colors cursor-pointer ${
                     settings.wordCount === cnt
-                      ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   {cnt}
@@ -1128,15 +1163,15 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           )}
 
           {/* Difficulty selector */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl">
+          <div className="hidden sm:flex items-center gap-0.5 bg-slate-100/70 dark:bg-slate-800/60 p-1 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
             {(['easy', 'medium', 'hard', 'expert'] as const).map(lvl => (
               <button
                 key={lvl}
                 onClick={() => updateSettings({ difficulty: lvl })}
-                className={`px-2 py-1 rounded-lg capitalize text-[11px] font-bold transition-all ${
+                className={`px-2 py-1 rounded-md capitalize text-[11px] font-medium transition-colors cursor-pointer ${
                   settings.difficulty === lvl
-                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 {lvl}
@@ -1144,17 +1179,17 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
             ))}
           </div>
 
-          {/* Typing Hint Toggle in Sidebar/Header */}
+          {/* Typing Hint Toggle */}
           <button
             onClick={() => updateSettings({ showHints: !settings.showHints })}
             title="Toggle Typing Hint (Romanized key sequence step-by-step)"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
               settings.showHints
-                ? 'bg-amber-400 dark:bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-2 ring-amber-400'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80'
             }`}
           >
-            <Lightbulb className={`w-3.5 h-3.5 ${settings.showHints ? 'fill-slate-950' : ''}`} />
+            <Lightbulb className={`w-3.5 h-3.5 ${settings.showHints ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} />
             <span>Hint: {settings.showHints ? 'ON' : 'OFF'}</span>
           </button>
 
@@ -1162,9 +1197,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           <button
             onClick={handleLocalRestart}
             title="Restart Test (Ctrl + Enter)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-medium transition-colors cursor-pointer shadow-2xs"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
             <span className="hidden sm:inline">Restart</span>
           </button>
         </div>
@@ -1175,19 +1210,19 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       <div
         ref={containerRef}
         onClick={() => inputRef.current?.focus()}
-        className={`relative w-full min-h-[220px] max-h-[400px] bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border-2 transition-all cursor-text overflow-hidden select-none flex flex-col justify-between ${
+        className={`relative w-full min-h-[240px] bg-white dark:bg-slate-900 rounded-xl p-6 sm:p-8 border transition-all cursor-text overflow-hidden select-none flex flex-col justify-between shadow-2xs ${
           inputShake
-            ? 'border-rose-500 ring-4 ring-rose-500/20 shadow-rose-500/10'
-            : 'border-slate-200/80 dark:border-slate-800 shadow-lg hover:border-blue-300 dark:hover:border-blue-800'
+            ? 'border-rose-500 ring-2 ring-rose-500/20'
+            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
         }`}
       >
         {/* Floating Rejected Key Notification */}
         {rejectedKeyInfo && (
-          <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/90 px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 shadow-md animate-bounce">
-            <span>Rejected: <strong className="font-mono text-rose-950 dark:text-rose-100 uppercase">{rejectedKeyInfo.key}</strong></span>
-            <span className="text-slate-400 dark:text-slate-600">|</span>
-            <span>Expected:</span>
-            <kbd className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase shadow-xs">
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs font-semibold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/90 px-3 py-1 rounded-lg border border-rose-200 dark:border-rose-800 shadow-sm animate-fadeIn">
+            <span>Key <strong className="font-mono text-rose-900 dark:text-rose-100 uppercase">{rejectedKeyInfo.key}</strong> not expected</span>
+            <span className="text-slate-300 dark:text-slate-600">|</span>
+            <span>Use:</span>
+            <kbd className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-mono text-[11px] px-1.5 py-0.5 rounded uppercase">
               {rejectedKeyInfo.expected}
             </kbd>
           </div>
@@ -1206,26 +1241,24 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         {/* Romanized Live Hint Panel */}
         {settings.showHints && currentTargetWord && !isTestFinished && (
-          <div className="mb-4 w-full bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-slate-900/10 dark:from-amber-950/80 dark:via-slate-900/90 dark:to-slate-950/90 border-2 border-amber-400/80 dark:border-amber-500/80 p-3 sm:p-4 rounded-2xl shadow-lg flex flex-col gap-3 animate-fadeIn">
+          <div className="mb-5 w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 sm:p-4 rounded-xl flex flex-col gap-2.5 animate-fadeIn">
             
             {/* Top Bar: Title & Progress */}
-            <div className="flex items-center justify-between gap-2 border-b border-amber-200/50 dark:border-slate-800 pb-2">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700/80 pb-2">
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider shadow-sm">
-                  <Lightbulb className="w-3.5 h-3.5 fill-slate-950" />
-                  <span>Live Hint Engine</span>
-                </div>
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                  Word {currentWordIndex + 1} of {targetWords.length}
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                  Typing Guidance
+                </span>
+                <span className="text-xs text-slate-400 dark:text-slate-500">
+                  • Word {currentWordIndex + 1} of {targetWords.length}
                 </span>
               </div>
 
               {hasMismatch && (
-                <div className="flex items-center gap-2 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/90 px-3 py-1 rounded-xl border border-rose-300 dark:border-rose-800 shadow-xs animate-bounce">
-                  <span>Wrong key: <strong className="font-mono text-rose-950 dark:text-rose-100 uppercase">{mismatchedChar || '?'}</strong></span>
-                  <span className="text-slate-400 dark:text-slate-600">|</span>
-                  <span>Required:</span>
-                  <kbd className="bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase shadow-xs">
+                <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
+                  <span>Typed <strong className="font-mono uppercase">{mismatchedChar || '?'}</strong>, needed:</span>
+                  <kbd className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-[11px] px-1.5 py-0.2 rounded font-mono">
                     {nextHintKey === ' ' ? 'Space' : nextHintKey}
                   </kbd>
                 </div>
@@ -1235,45 +1268,45 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
             {/* Main Guidance Row */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               {/* Target Word & Key Sequence */}
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                 {/* Devanagari Word */}
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Current Word</span>
-                  <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-300" style={getFontFamilyStyle()}>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">Current Word</span>
+                  <span className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400" style={getFontFamilyStyle()}>
                     {currentTargetWord}
                   </span>
                 </div>
 
-                <span className="text-amber-400 font-bold hidden sm:inline">→</span>
+                <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">→</span>
 
                 {/* Character Key Sequence Breakdown */}
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Romanized Sequence</span>
-                  <div className="flex items-center gap-0.5 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-slate-800 shadow-inner font-mono text-base sm:text-lg">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">Key Sequence</span>
+                  <div className="flex items-center gap-0.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 font-mono text-sm sm:text-base">
                     {/* Completed Part */}
                     {completedPart && (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                         {completedPart}
                       </span>
                     )}
 
                     {/* Next Key */}
                     {!isWordFullyTyped && nextHintKey && nextHintKey !== ' ' && (
-                      <span className="bg-amber-400 dark:bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse uppercase mx-0.5">
+                      <span className="bg-blue-600 text-white font-bold px-1.5 py-0.2 rounded text-xs uppercase mx-0.5">
                         {nextHintKey}
                       </span>
                     )}
 
                     {/* Remaining Part */}
                     {remainingPart && (
-                      <span className="text-slate-400 dark:text-slate-500 font-medium">
+                      <span className="text-slate-400 dark:text-slate-500">
                         {remainingPart}
                       </span>
                     )}
 
                     {/* Spacebar Prompt */}
                     {isWordFullyTyped && (
-                      <span className="bg-amber-400 dark:bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-lg ring-2 ring-amber-400/80 shadow-md animate-pulse uppercase tracking-wider flex items-center gap-1">
+                      <span className="bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded uppercase tracking-wider">
                         Press Space ↵
                       </span>
                     )}
@@ -1282,10 +1315,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
               </div>
 
               {/* Prominent Next Key Badge */}
-              <div className="flex flex-col items-center justify-center bg-white dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-600/80 px-4 py-1.5 rounded-2xl min-w-[90px] shadow-sm">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Next Key</span>
-                <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 animate-pulse uppercase">
-                  {nextHintKey === ' ' ? 'SPACE ␣' : (nextHintKey || '—')}
+              <div className="flex flex-col items-center justify-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-lg min-w-[80px]">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">Next Key</span>
+                <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-mono uppercase">
+                  {nextHintKey === ' ' ? 'SPACE' : (nextHintKey || '—')}
                 </span>
               </div>
             </div>
@@ -1294,20 +1327,19 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
         {/* Romanized Live Buffer Indicator (Floating Preview) */}
         {settings.language === 'nepali' && romanBuffer && (
-          <div className="mb-4 inline-flex items-center gap-3 bg-blue-50 dark:bg-blue-950/80 border border-blue-200 dark:border-blue-800 px-4 py-2 rounded-xl text-blue-700 dark:text-blue-300 text-sm font-semibold shadow-sm animate-fadeIn">
+          <div className="mb-4 inline-flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3.5 py-1.5 rounded-lg text-slate-800 dark:text-slate-200 text-sm font-medium animate-fadeIn">
             <span className="text-slate-400 dark:text-slate-500 font-mono text-xs">
-              Typed: <strong className="text-blue-900 dark:text-blue-200">{romanBuffer}</strong>
+              Input: <strong className="text-slate-900 dark:text-white">{romanBuffer}</strong>
             </span>
-            <span className="text-slate-300 dark:text-slate-700">|</span>
-            <span className="flex items-center gap-1 text-base font-bold text-blue-700 dark:text-blue-300" style={getFontFamilyStyle()}>
-              <Sparkles className="w-4 h-4 text-amber-500" />
+            <span className="text-slate-200 dark:text-slate-700">|</span>
+            <span className="text-base font-bold text-blue-600 dark:text-blue-400" style={getFontFamilyStyle()}>
               {typedInput}
             </span>
             {activeSuggestions.length > 1 && (
-              <div className="hidden sm:flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                <span>Suggestions:</span>
+              <div className="hidden sm:flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 ml-2">
+                <span>Options:</span>
                 {activeSuggestions.slice(1, 3).map((sug, i) => (
-                  <span key={i} className="bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800">
+                  <span key={i} className="bg-white dark:bg-slate-900 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700 text-xs">
                     {sug}
                   </span>
                 ))}
@@ -1319,7 +1351,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
         {/* Text View Container */}
         <div
           ref={textContainerRef}
-          className={`w-full flex flex-wrap gap-x-3 gap-y-2 text-slate-400 dark:text-slate-500 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 py-4 scroll-smooth ${getFontSizeClass()}`}
+          className={`w-full flex flex-wrap gap-x-3.5 gap-y-2.5 text-slate-400 dark:text-slate-500 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 py-4 scroll-smooth ${getFontSizeClass()}`}
           style={getFontFamilyStyle()}
         >
           {targetWords.map((word, wordIdx) => {

@@ -42,128 +42,94 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
   }
 
   return (
-    <div id="live-stats-bar" className="w-full bg-white dark:bg-slate-800/80 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-700/80 mb-6 transition-all">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 items-center">
+    <div id="live-stats-bar" className="w-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs transition-all overflow-hidden">
+      <div className="flex flex-wrap items-center divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800/80">
         
         {/* Net WPM */}
         {settings.showLiveWpm && (
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-              <Gauge className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight leading-none">
-                {netWpm}
-              </div>
-              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">
-                Net WPM
-              </div>
+          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Net WPM
+            </span>
+            <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 tabular-nums leading-tight mt-0.5">
+              {netWpm}
             </div>
           </div>
         )}
 
         {/* Gross WPM */}
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-            <Activity className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 tracking-tight leading-none">
-              {grossWpm}
-            </div>
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">
-              Gross WPM
-            </div>
+        <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            Gross WPM
+          </span>
+          <div className="text-2xl sm:text-3xl font-semibold text-slate-800 dark:text-slate-200 tabular-nums leading-tight mt-0.5">
+            {grossWpm}
           </div>
         </div>
 
         {/* Accuracy */}
         {settings.showLiveAccuracy && (
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${
+          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Accuracy
+            </span>
+            <div className={`text-2xl sm:text-3xl font-semibold tabular-nums leading-tight mt-0.5 ${
               accuracy >= 95
-                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                ? 'text-emerald-600 dark:text-emerald-400'
                 : accuracy >= 85
-                ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'
-                : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400'
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-rose-600 dark:text-rose-400'
             }`}>
-              <Target className="w-5 h-5" />
-            </div>
-            <div>
-              <div className={`text-2xl font-bold tracking-tight leading-none ${
-                accuracy >= 95
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : accuracy >= 85
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-rose-600 dark:text-rose-400'
-              }`}>
-                {accuracy}%
-              </div>
-              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">
-                Accuracy
-              </div>
+              {accuracy}%
             </div>
           </div>
         )}
 
         {/* Time / Progress */}
         {settings.showTimer && (
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 tracking-tight leading-none">
-                {remainingSeconds !== null ? formatTime(remainingSeconds) : formatTime(elapsedSeconds)}
-              </div>
-              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">
-                {remainingSeconds !== null ? 'Remaining' : 'Elapsed'}
-              </div>
+          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              {remainingSeconds !== null ? 'Time Remaining' : 'Elapsed Time'}
+            </span>
+            <div className="text-2xl sm:text-3xl font-semibold text-slate-800 dark:text-slate-200 tabular-nums leading-tight mt-0.5">
+              {remainingSeconds !== null ? formatTime(remainingSeconds) : formatTime(elapsedSeconds)}
             </div>
           </div>
         )}
 
         {/* Mistakes Count */}
         {settings.showMistakes && (
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 tracking-tight leading-none">
-                {mistakesCount}
-              </div>
-              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">
-                Mistakes
-              </div>
+          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Mistakes
+            </span>
+            <div className="text-2xl sm:text-3xl font-semibold text-rose-600 dark:text-rose-400 tabular-nums leading-tight mt-0.5">
+              {mistakesCount}
             </div>
           </div>
         )}
 
         {/* Backspaces */}
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300">
-            <Delete className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-700 dark:text-slate-300 tracking-tight leading-none">
-              {backspacesCount}
-            </div>
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">
-              Backspaces
-            </div>
+        <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            Backspaces
+          </span>
+          <div className="text-2xl sm:text-3xl font-semibold text-slate-600 dark:text-slate-300 tabular-nums leading-tight mt-0.5">
+            {backspacesCount}
           </div>
         </div>
 
       </div>
 
       {/* Progress Bar Line */}
-      <div className="w-full bg-slate-100 dark:bg-slate-700/60 rounded-full h-2 mt-4 overflow-hidden">
-        <div
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${progressPercent}%` }}
-        ></div>
-      </div>
+      {(settings.testType === 'time' || settings.testType === 'words') && (
+        <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 overflow-hidden">
+          <div
+            className="bg-blue-600 dark:bg-blue-500 h-1 transition-all duration-300 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          ></div>
+        </div>
+      )}
     </div>
   );
 };

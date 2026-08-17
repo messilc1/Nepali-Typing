@@ -28,6 +28,7 @@ import {
   Keyboard as KeyboardIcon,
   ShieldCheck
 } from 'lucide-react';
+import { sanitizeTargetText, isCharacterEquivalent } from '../../utils/textNormalizer';
 
 interface EnglishTypingPlayerProps {
   modeType: 'course-lesson' | 'quick-test' | 'word-test' | 'paragraph-test' | 'practice-module' | 'improvement-drill';
@@ -70,12 +71,13 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
 }) => {
   // Determine target text
   const targetText = useMemo(() => {
-    if (customText) return customText.trim();
-    if (lesson) return lesson.targetText.trim();
-    if (paragraphTest) return paragraphTest.text.trim();
-    if (practiceModule) return practiceModule.items.join(' ').trim();
-    if (improvementDrill) return improvementDrill.content.trim();
-    return 'The quick brown fox jumps over the lazy dog.';
+    let raw = 'The quick brown fox jumps over the lazy dog.';
+    if (customText) raw = customText;
+    else if (lesson) raw = lesson.targetText;
+    else if (paragraphTest) raw = paragraphTest.text;
+    else if (practiceModule) raw = practiceModule.items.join(' ');
+    else if (improvementDrill) raw = improvementDrill.content;
+    return sanitizeTargetText(raw.trim());
   }, [customText, lesson, paragraphTest, practiceModule, improvementDrill]);
 
   const targetChars = useMemo(() => targetText.split(''), [targetText]);
@@ -311,13 +313,15 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       existingKeyStat.totalHits += 1;
       existingKeyStat.totalTimeMs += keyLatency;
 
-      if (e.key === expectedChar) {
+      const isMatch = e.key === expectedChar || isCharacterEquivalent(e.key, expectedChar);
+
+      if (isMatch) {
         // Correct Keystroke
         existingKeyStat.correctHits += 1;
         keyStatsMapRef.current[lowerKey] = existingKeyStat;
 
         playClickSound(false);
-        setTypedChars(prev => [...prev, { char: e.key, isCorrect: true }]);
+        setTypedChars(prev => [...prev, { char: expectedChar, isCorrect: true }]);
 
         const nextIdx = currentIndex + 1;
         setCurrentIndex(nextIdx);

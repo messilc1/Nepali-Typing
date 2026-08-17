@@ -3,6 +3,8 @@
  * Compatible with Google Input Tools / Hamro Keyboard Romanized typing style
  */
 
+import { stripInvisibleCharacters, normalizeTypography, isCharacterEquivalent, areDevanagariWordsEquivalent } from './textNormalizer';
+
 // Dictionary for high-accuracy standard words & legal/constitutional vocabulary
 export const COMMON_DICTIONARY: Record<string, string> = {
   // Greetings & Pronouns
@@ -158,6 +160,7 @@ export const COMMON_DICTIONARY: Record<string, string> = {
   utpreshan: 'उत्प्रेषण',
   paramadeshko: 'परमादेशको',
   jari: 'जारी',
+
   garipaum: 'गरिपाऊँ',
   bhanne: 'भन्ने',
   sunuwai: 'सुनुवाइ',
@@ -286,21 +289,67 @@ const NUMBERS: Record<string, string> = {
   '9': '९',
 };
 
+// Common Nepali case and plural suffixes
+const SUFFIX_MAP: [string, string][] = [
+  ['harulai', 'हरूलाई'],
+  ['haruko', 'हरूको'],
+  ['haruma', 'हरूमा'],
+  ['harule', 'हरूले'],
+  ['haru', 'हरू'],
+  ['bata', 'बाट'],
+  ['sanga', 'सँग'],
+  ['lai', 'लाई'],
+  ['maa', 'मा'],
+  ['ma', 'मा'],
+  ['ko', 'को'],
+  ['kaa', 'का'],
+  ['ka', 'का'],
+  ['ki', 'की'],
+  ['le', 'ले'],
+  ['dekhi', 'देखि'],
+  ['dvara', 'द्वारा'],
+  ['chha', 'छ'],
+  ['chhan', 'छन्'],
+  ['bhayeko', 'भएको'],
+];
+
+const REVERSE_SUFFIX_MAP: [string, string][] = [
+  ['हरूलाई', 'harulai'],
+  ['हरूको', 'haruko'],
+  ['हरूमा', 'haruma'],
+  ['हरूले', 'harule'],
+  ['हरू', 'haru'],
+  ['बाट', 'bata'],
+  ['सँग', 'sanga'],
+  ['लाई', 'lai'],
+  ['मा', 'ma'],
+  ['को', 'ko'],
+  ['का', 'ka'],
+  ['की', 'ki'],
+  ['ले', 'le'],
+  ['देखि', 'dekhi'],
+  ['द्वारा', 'dvara'],
+  ['छन्', 'chhan'],
+  ['छ', 'chha'],
+];
+
 /**
  * Rules-based transliteration from Romanized English to Devanagari Unicode
  */
 export function transliterateWordRuleBased(roman: string): string {
   if (!roman) return '';
 
+  const sanitized = stripInvisibleCharacters(roman);
+
   // Extract leading and trailing punctuation
-  const prefixMatch = roman.match(/^[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+/);
+  const prefixMatch = sanitized.match(/^[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+/);
   const leadingPunct = prefixMatch ? prefixMatch[0] : '';
-  const suffixMatch = roman.match(/[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+$/);
+  const suffixMatch = sanitized.match(/[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+$/);
   const trailingPunct = suffixMatch ? suffixMatch[0] : '';
 
-  const core = roman.substring(
+  const core = sanitized.substring(
     leadingPunct.length,
-    roman.length - (trailingPunct ? trailingPunct.length : 0)
+    sanitized.length - (trailingPunct ? trailingPunct.length : 0)
   ).trim();
 
   const convertPunct = (p: string) => {
@@ -308,10 +357,12 @@ export function transliterateWordRuleBased(roman: string): string {
   };
 
   if (!core) {
-    return convertPunct(roman);
+    return convertPunct(sanitized);
   }
 
   const clean = core.toLowerCase();
+  
+  // Direct dictionary match
   if (COMMON_DICTIONARY[clean]) {
     return convertPunct(leadingPunct) + COMMON_DICTIONARY[clean] + convertPunct(trailingPunct);
   }
@@ -319,12 +370,22 @@ export function transliterateWordRuleBased(roman: string): string {
     return convertPunct(leadingPunct) + COMMON_DICTIONARY[core] + convertPunct(trailingPunct);
   }
 
+  // Compound stem + suffix match (e.g. "nepalko" -> "nepal" + "ko")
+  for (const [sufRoman, sufDev] of SUFFIX_MAP) {
+    if (clean.endsWith(sufRoman) && clean.length > sufRoman.length) {
+      const stem = clean.substring(0, clean.length - sufRoman.length);
+      if (COMMON_DICTIONARY[stem]) {
+        return convertPunct(leadingPunct) + COMMON_DICTIONARY[stem] + sufDev + convertPunct(trailingPunct);
+      }
+    }
+  }
+
   let result = '';
   let i = 0;
-  const n = roman.length;
+  const n = clean.length;
 
   while (i < n) {
-    const char = roman[i];
+    const char = clean[i];
 
     // Numbers
     if (NUMBERS[char]) {
@@ -353,7 +414,7 @@ export function transliterateWordRuleBased(roman: string): string {
     let matchedLen = 0;
 
     for (const [key, devanagari] of CONSONANT_ENTRIES) {
-      if (roman.substring(i, i + key.length) === key) {
+      if (clean.substring(i, i + key.length) === key.toLowerCase()) {
         matchedConsonant = devanagari;
         matchedLen = key.length;
         break;
@@ -372,7 +433,7 @@ export function transliterateWordRuleBased(roman: string): string {
       }
 
       // Check for vowel matra following consonant
-      const rest = roman.substring(i);
+      const rest = clean.substring(i);
       let matchedMatra: string | null = null;
       let matraLen = 0;
 
@@ -395,7 +456,7 @@ export function transliterateWordRuleBased(roman: string): string {
         i += matraLen;
 
         // Check for anusvara (m or n followed by consonant/end) or chandrabindu
-        if (i < n && (roman[i] === '~')) {
+        if (i < n && (clean[i] === '~')) {
           result += 'ँ';
           i++;
         }
@@ -411,7 +472,7 @@ export function transliterateWordRuleBased(roman: string): string {
     let matchedVowel: string | null = null;
     let vowelLen = 0;
 
-    const twoCharVowel = roman.substring(i, i + 2);
+    const twoCharVowel = clean.substring(i, i + 2);
     if (VOWELS[twoCharVowel]) {
       matchedVowel = VOWELS[twoCharVowel];
       vowelLen = 2;
@@ -431,8 +492,9 @@ export function transliterateWordRuleBased(roman: string): string {
     i++;
   }
 
-  return result;
+  return convertPunct(leadingPunct) + result + convertPunct(trailingPunct);
 }
+
 
 /**
  * Transliterates an entire string (sentence or paragraph) word by word or token by token
@@ -503,7 +565,9 @@ export const DEVANAGARI_CONSONANTS: Record<string, string> = {
   'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n',
   'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm',
   'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'v', 'श': 'sh', 'ष': 'Sh', 'स': 's', 'ह': 'h',
-  'क्ष': 'ksh', 'त्र': 'tr', 'ज्ञ': 'gy', 'श्र': 'shr'
+  'क्ष': 'ksh', 'त्र': 'tr', 'ज्ञ': 'gy', 'श्र': 'shr',
+  'त्त': 'tt', 'द्ध': 'ddh', 'द्य': 'dy', 'द्घ': 'dgh', 'द्ब': 'db', 'द्द': 'dd', 'द्भ': 'dbh',
+  'ष्ट्र': 'shtra', 'ष्ट': 'sht', 'ष्ठ': 'shth', 'न्द्द': 'ndd', 'ङ्क': 'nk', 'ङ्ग': 'ng', 'ञ्च': 'nch', 'ञ्ज': 'nj'
 };
 
 export const DEVANAGARI_INDEPENDENT_VOWELS: Record<string, string> = {
@@ -520,15 +584,17 @@ export const DEVANAGARI_VOWEL_MATRAS: Record<string, string> = {
 export function getRomanizedHintForWord(word: string): string {
   if (!word) return '';
 
+  const sanitized = stripInvisibleCharacters(word);
+
   // Extract leading and trailing punctuation
-  const prefixMatch = word.match(/^[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+/);
+  const prefixMatch = sanitized.match(/^[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+/);
   const leadingPunct = prefixMatch ? prefixMatch[0] : '';
-  const suffixMatch = word.match(/[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+$/);
+  const suffixMatch = sanitized.match(/[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/]+$/);
   const trailingPunct = suffixMatch ? suffixMatch[0] : '';
 
-  const clean = word.substring(
+  const clean = sanitized.substring(
     leadingPunct.length,
-    word.length - (trailingPunct ? trailingPunct.length : 0)
+    sanitized.length - (trailingPunct ? trailingPunct.length : 0)
   ).trim();
 
   // If already English text, return as-is lowercase with punctuation
@@ -541,74 +607,93 @@ export function getRomanizedHintForWord(word: string): string {
   if (REVERSE_DICTIONARY[clean]) {
     coreResult = REVERSE_DICTIONARY[clean];
   } else {
-    let result = '';
-    let i = 0;
-    const n = clean.length;
-
-    while (i < n) {
-      const char = clean[i];
-
-      // Numbers
-      if (/[०-९]/.test(char)) {
-        const numMap: Record<string, string> = { '०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9' };
-        result += numMap[char] || char;
-        i++;
-        continue;
+    // Check reverse suffix match (e.g. "नेपालको" -> "nepal" + "ko")
+    let suffixMatched = false;
+    for (const [sufDev, sufRoman] of REVERSE_SUFFIX_MAP) {
+      if (clean.endsWith(sufDev) && clean.length > sufDev.length) {
+        const stem = clean.substring(0, clean.length - sufDev.length);
+        if (REVERSE_DICTIONARY[stem]) {
+          coreResult = REVERSE_DICTIONARY[stem] + sufRoman;
+          suffixMatched = true;
+          break;
+        }
       }
+    }
 
-      // Check for 2-char conjuncts
-      const twoChar = clean.substring(i, i + 2);
-      let matchedConsonant: string | null = null;
-      let matchedLen = 0;
+    if (!suffixMatched) {
+      let result = '';
+      let i = 0;
+      const n = clean.length;
 
-      if (DEVANAGARI_CONSONANTS[twoChar]) {
-        matchedConsonant = DEVANAGARI_CONSONANTS[twoChar];
-        matchedLen = 2;
-      } else if (DEVANAGARI_CONSONANTS[char]) {
-        matchedConsonant = DEVANAGARI_CONSONANTS[char];
-        matchedLen = 1;
-      }
+      while (i < n) {
+        const char = clean[i];
 
-      if (matchedConsonant) {
-        result += matchedConsonant;
-        i += matchedLen;
+        // Numbers
+        if (/[०-९]/.test(char)) {
+          const numMap: Record<string, string> = { '०':'0','१':'1','२':'2','३':'3','४':'4','५':'5','६':'6','७':'7','८':'8','९':'9' };
+          result += numMap[char] || char;
+          i++;
+          continue;
+        }
 
-        if (i < n) {
-          const nextChar = clean[i];
-          if (nextChar === '्') {
-            // Halant: explicit no vowel following consonant
-            i++;
-          } else if (DEVANAGARI_VOWEL_MATRAS[nextChar]) {
-            result += DEVANAGARI_VOWEL_MATRAS[nextChar];
-            i++;
-          } else {
-            // Inherent 'a' vowel if followed by another consonant or end of word
-            if (i < n && !/[।,\.\s]/.test(nextChar)) {
-              result += 'a';
+        // Check for 3-char and 2-char conjuncts
+        const threeChar = clean.substring(i, i + 3);
+        const twoChar = clean.substring(i, i + 2);
+        let matchedConsonant: string | null = null;
+        let matchedLen = 0;
+
+        if (DEVANAGARI_CONSONANTS[threeChar]) {
+          matchedConsonant = DEVANAGARI_CONSONANTS[threeChar];
+          matchedLen = 3;
+        } else if (DEVANAGARI_CONSONANTS[twoChar]) {
+          matchedConsonant = DEVANAGARI_CONSONANTS[twoChar];
+          matchedLen = 2;
+        } else if (DEVANAGARI_CONSONANTS[char]) {
+          matchedConsonant = DEVANAGARI_CONSONANTS[char];
+          matchedLen = 1;
+        }
+
+        if (matchedConsonant) {
+          result += matchedConsonant;
+          i += matchedLen;
+
+          if (i < n) {
+            const nextChar = clean[i];
+            if (nextChar === '्') {
+              // Halant: explicit no vowel following consonant
+              i++;
+            } else if (DEVANAGARI_VOWEL_MATRAS[nextChar]) {
+              result += DEVANAGARI_VOWEL_MATRAS[nextChar];
+              i++;
+            } else {
+              // Inherent 'a' vowel if followed by another consonant or end of word
+              if (i < n && !/[।,!\?:;"'\(\)\[\]\{\}\.\-\—\<\>\/\s]/.test(nextChar)) {
+                result += 'a';
+              }
             }
           }
+          continue;
         }
-        continue;
-      }
 
-      // Independent Vowels
-      if (DEVANAGARI_INDEPENDENT_VOWELS[char]) {
-        result += DEVANAGARI_INDEPENDENT_VOWELS[char];
+        // Independent Vowels
+        if (DEVANAGARI_INDEPENDENT_VOWELS[char]) {
+          result += DEVANAGARI_INDEPENDENT_VOWELS[char];
+          i++;
+          continue;
+        }
+
+        // Matra
+        if (DEVANAGARI_VOWEL_MATRAS[char]) {
+          result += DEVANAGARI_VOWEL_MATRAS[char];
+          i++;
+          continue;
+        }
+
+        result += char;
         i++;
-        continue;
       }
-
-      // Matra
-      if (DEVANAGARI_VOWEL_MATRAS[char]) {
-        result += DEVANAGARI_VOWEL_MATRAS[char];
-        i++;
-        continue;
-      }
-
-      result += char;
-      i++;
+      coreResult = result;
     }
-    coreResult = result;
   }
 
   const convertedTrailingPunct = trailingPunct === '।' ? '.' : trailingPunct;
@@ -616,4 +701,5 @@ export function getRomanizedHintForWord(word: string): string {
 
   return convertedLeadingPunct + coreResult + convertedTrailingPunct;
 }
+
 
