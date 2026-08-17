@@ -160,7 +160,7 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
     }));
 
     setActiveRaceConfig({
-      text: config.countdownData.text,
+      text: config.countdownData.targetText,
       opponents,
       raceTitle: `Multiplayer Room ${config.lobby.roomId} (Round ${config.lobby.currentRound}/${config.lobby.totalRounds})`,
       isRanked: true
@@ -863,16 +863,11 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
           profile={profile}
           language={language}
           isRanked={false}
-          onLaunchMatch={(config) => {
-            setActiveRaceConfig({
-              text: config.text,
-              opponents: config.opponents,
-              raceTitle: config.raceTitle,
-              isRanked: true
-            });
-            setCurrentView('racing');
+          onLaunchMultiplayerMatch={handleLaunchMultiplayerMatch}
+          onBack={() => {
+            setMultiplayerMatchInfo(null);
+            setCurrentView('hub');
           }}
-          onBack={() => setCurrentView('hub')}
         />
       )}
 
@@ -880,15 +875,11 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
         <FriendsMultiplayerView
           profile={profile}
           language={language}
-          onLaunchFriendMatch={(config) => {
-            setActiveRaceConfig({
-              text: config.text,
-              opponents: config.opponents,
-              raceTitle: config.raceTitle
-            });
-            setCurrentView('racing');
+          onLaunchMultiplayerMatch={handleLaunchMultiplayerMatch}
+          onBack={() => {
+            setMultiplayerMatchInfo(null);
+            setCurrentView('hub');
           }}
-          onBack={() => setCurrentView('hub')}
         />
       )}
 
@@ -937,9 +928,25 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
           targetText={activeRaceConfig.text}
           opponents={activeRaceConfig.opponents}
           userAvatar={profile.selectedAvatar || '🏎️'}
-          userName="Subhash"
+          userName={
+            (() => {
+              try {
+                const saved = localStorage.getItem('ntp_user_display_name');
+                if (saved) return saved;
+              } catch {}
+              return profile.equippedTitle && profile.equippedTitle !== 'Rookie Racer'
+                ? `${profile.equippedTitle} Typist`
+                : 'Subhash Lamichhane';
+            })()
+          }
+          isMultiplayer={!!multiplayerMatchInfo}
+          multiplayerLobby={multiplayerMatchInfo?.lobby}
+          multiplayerCountdownData={multiplayerMatchInfo?.countdownData}
           onFinishRace={handleFinishRace}
-          onExit={() => setCurrentView('hub')}
+          onExit={() => {
+            setMultiplayerMatchInfo(null);
+            setCurrentView('hub');
+          }}
         />
       )}
 
@@ -958,16 +965,23 @@ export const TypingArenaHub: React.FC<TypingArenaHubProps> = ({ liveKeyStatsMap 
           mistypedKeys={raceResultsData.mistypedKeys}
           mistypedWords={raceResultsData.mistypedWords}
           wpmHistory={raceResultsData.wpmHistory}
+          officialMultiplayerResults={raceResultsData.officialMultiplayerResults}
           onPlayAgain={() => {
             setRaceResultsData(null);
-            handleQuickRace();
+            if (multiplayerMatchInfo) {
+              setCurrentView('friends');
+            } else {
+              handleQuickRace();
+            }
           }}
           onExitToHub={() => {
             setRaceResultsData(null);
+            setMultiplayerMatchInfo(null);
             setCurrentView('hub');
           }}
           onPracticeWeakness={(keys) => {
             setRaceResultsData(null);
+            setMultiplayerMatchInfo(null);
             setCurrentView('weakness');
           }}
           gameModeTitle={activeRaceConfig?.raceTitle || 'Typing Arena Race'}
