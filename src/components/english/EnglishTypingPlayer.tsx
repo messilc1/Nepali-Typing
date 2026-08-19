@@ -78,7 +78,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     else if (paragraphTest) raw = paragraphTest.text;
     else if (practiceModule) raw = practiceModule.items.join(' ');
     else if (improvementDrill) raw = improvementDrill.content;
-    return sanitizeTargetText(raw.trim());
+    return sanitizeTargetText(raw);
   }, [customText, lesson, paragraphTest, practiceModule, improvementDrill]);
 
   const targetChars = useMemo(() => targetText.split(''), [targetText]);
@@ -351,15 +351,16 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       return;
     }
 
-    // Single character input
-    if (e.key.length === 1) {
+    // Single character or Enter key input
+    if (e.key.length === 1 || e.key === 'Enter') {
       e.preventDefault();
-      const lowerKey = e.key.toLowerCase();
+      const inputChar = e.key === 'Enter' ? '\n' : e.key;
+      const lowerKey = inputChar.toLowerCase();
 
       // Key stats update
       const existingKeyStat = keyStatsMapRef.current[lowerKey] || {
         key: lowerKey,
-        label: lowerKey.toUpperCase(),
+        label: lowerKey === '\n' ? 'ENTER' : lowerKey.toUpperCase(),
         totalHits: 0,
         correctHits: 0,
         mistakes: 0,
@@ -368,7 +369,10 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       existingKeyStat.totalHits += 1;
       existingKeyStat.totalTimeMs += keyLatency;
 
-      const isMatch = e.key === expectedChar || isCharacterEquivalent(e.key, expectedChar);
+      const isMatch =
+        inputChar === expectedChar ||
+        (e.key === 'Enter' && expectedChar === '\n') ||
+        isCharacterEquivalent(inputChar, expectedChar);
 
       if (isMatch) {
         // Correct Keystroke
@@ -399,7 +403,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
 
         detailedCharErrorsRef.current.push({
           targetChar: expectedChar,
-          typedChar: e.key,
+          typedChar: inputChar,
           frequency: 1,
           targetWord: '',
           position: currentIndex,
@@ -416,7 +420,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
 
         // In 'allow' mode, advance cursor with mistake recorded
         if (mistakeMode === 'allow') {
-          setTypedChars(prev => [...prev, { char: e.key, isCorrect: false }]);
+          setTypedChars(prev => [...prev, { char: inputChar, isCorrect: false }]);
           const nextIdx = currentIndex + 1;
           setCurrentIndex(nextIdx);
 
@@ -571,19 +575,28 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
               </span>
             )}
           </div>
-          <div className="font-mono text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 flex flex-wrap gap-x-0.5 max-h-24 overflow-y-auto">
-            {typedChars.map((tc, idx) => (
-              <span
-                key={idx}
-                className={
-                  tc.isCorrect
-                    ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                    : 'text-rose-600 dark:text-rose-400 font-bold underline decoration-rose-500 bg-rose-100 dark:bg-rose-950/60 px-0.5 rounded'
-                }
-              >
-                {tc.char === ' ' ? ' ' : tc.char}
-              </span>
-            ))}
+          <div className="font-mono text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap max-h-24 overflow-y-auto">
+            {typedChars.map((tc, idx) => {
+              if (tc.char === '\n') {
+                return (
+                  <span key={idx} className="text-slate-400 text-xs whitespace-pre">
+                    ↵{'\n'}
+                  </span>
+                );
+              }
+              return (
+                <span
+                  key={idx}
+                  className={`${
+                    tc.isCorrect
+                      ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                      : 'text-rose-600 dark:text-rose-400 font-bold underline decoration-rose-500 bg-rose-100 dark:bg-rose-950/60 px-0.5 rounded'
+                  } whitespace-pre`}
+                >
+                  {tc.char}
+                </span>
+              );
+            })}
             {typedChars.length === 0 && (
               <span className="text-xs text-slate-400 italic font-sans">
                 Start typing to see live keystroke output here...
@@ -607,27 +620,79 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         {/* Typing Characters Stream with Auto-Scroll Tracking */}
         <div
           ref={textContainerRef}
-          className="relative text-xl sm:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] max-h-[260px] overflow-y-auto p-4 pb-28 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none scroll-smooth"
+          className="relative text-xl sm:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] max-h-[260px] overflow-y-auto p-4 pb-28 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none scroll-smooth whitespace-pre-wrap select-none"
         >
           {targetChars.map((char, index) => {
             const isTyped = index < currentIndex;
             const isCurrent = index === currentIndex;
+
+            if (char === ' ') {
+              if (isCurrent) {
+                return (
+                  <span
+                    key={index}
+                    ref={activeCharRef}
+                    className="bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse whitespace-pre inline-block"
+                  >
+                    ␣
+                  </span>
+                );
+              }
+              return (
+                <span
+                  key={index}
+                  className={`whitespace-pre ${
+                    isTyped
+                      ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }`}
+                >
+                  {' '}
+                </span>
+              );
+            }
+
+            if (char === '\n') {
+              if (isCurrent) {
+                return (
+                  <span
+                    key={index}
+                    ref={activeCharRef}
+                    className="bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse text-xs whitespace-pre inline-block"
+                  >
+                    ↵{'\n'}
+                  </span>
+                );
+              }
+              return (
+                <span
+                  key={index}
+                  className={`text-xs whitespace-pre ${
+                    isTyped
+                      ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                      : 'text-slate-300 dark:text-slate-600 opacity-60'
+                  }`}
+                >
+                  ↵{'\n'}
+                </span>
+              );
+            }
 
             let charClass = 'text-slate-400 dark:text-slate-500';
 
             if (isTyped) {
               charClass = 'text-emerald-600 dark:text-emerald-400 font-semibold';
             } else if (isCurrent) {
-              charClass = 'bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse';
+              charClass = 'bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse inline-block';
             }
 
             return (
               <span
                 key={index}
                 ref={isCurrent ? activeCharRef : null}
-                className={`transition-colors inline-block ${charClass}`}
+                className={`transition-colors whitespace-pre ${charClass}`}
               >
-                {char === ' ' && isCurrent ? '␣' : char}
+                {char}
               </span>
             );
           })}

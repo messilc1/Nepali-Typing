@@ -803,7 +803,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({ onBack }) 
           </div>
 
           {/* Target Text Prompt Display */}
-          <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 leading-relaxed font-semibold text-base sm:text-xl text-slate-800 dark:text-slate-200 tracking-wide font-['Noto_Sans_Devanagari',sans-serif] select-none pointer-events-none max-h-64 overflow-y-auto">
+          <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 leading-relaxed font-semibold text-base sm:text-xl text-slate-800 dark:text-slate-200 tracking-wide font-['Noto_Sans_Devanagari',sans-serif] select-none pointer-events-none max-h-64 overflow-y-auto whitespace-pre-wrap">
             {getTargetTextForTest(activeTestIndex)}
           </div>
 

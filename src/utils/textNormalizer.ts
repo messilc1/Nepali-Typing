@@ -44,26 +44,22 @@ export function normalizeTypography(text: string): string {
 
 /**
  * Full clean normalization for custom paragraphs and target texts
+ * Preserves all original spaces, multiple spaces, line breaks, and punctuation.
  */
 export function sanitizeTargetText(text: string): string {
   if (!text) return '';
   const cleaned = stripInvisibleCharacters(text);
   const normalized = normalizeTypography(cleaned);
-  // Collapse multiple spaces/tabs within lines while preserving single spacing between words
-  return normalized
-    .split('\n')
-    .map(line => line.replace(/[ \t]+/g, ' ').trim())
-    .filter(Boolean)
-    .join(' ');
+  return normalized;
 }
 
 /**
- * Prepares array of target words from paragraph text, guaranteed non-empty and sanitized
+ * Prepares array of target words from paragraph text, preserving words and word separation
  */
 export function extractSanitizedWords(text: string): string[] {
   const sanitized = sanitizeTargetText(text);
   if (!sanitized) return [];
-  return sanitized.split(/\s+/).filter(w => w.trim().length > 0);
+  return sanitized.split(/\s+/).filter(w => w.length > 0);
 }
 
 /**
