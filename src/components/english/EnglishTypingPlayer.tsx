@@ -12,7 +12,7 @@ import {
 } from '../../types';
 import { EnglishKeyboardGuide } from './EnglishKeyboardGuide';
 import { LokSewaToggle } from '../LokSewaToggle';
-import { calculateLokSewaEvaluation } from '../../utils/lokSewaEvaluation';
+import { calculateLokSewaEvaluation, ensureLokSewaMinimumWords } from '../../utils/lokSewaEvaluation';
 import {
   Clock,
   Zap,
@@ -86,8 +86,12 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     else if (paragraphTest) raw = paragraphTest.text;
     else if (practiceModule) raw = practiceModule.items.join(' ');
     else if (improvementDrill) raw = improvementDrill.content;
-    return sanitizeTargetText(raw);
-  }, [customText, lesson, paragraphTest, practiceModule, improvementDrill]);
+    const sanitized = sanitizeTargetText(raw);
+    if (lokSewaActive) {
+      return ensureLokSewaMinimumWords(sanitized, 300);
+    }
+    return sanitized;
+  }, [customText, lesson, paragraphTest, practiceModule, improvementDrill, lokSewaActive]);
 
   const targetChars = useMemo(() => targetText.split(''), [targetText]);
 

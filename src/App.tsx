@@ -19,6 +19,7 @@ import { CustomTextModal } from './components/CustomTextModal';
 
 import { TestSettings, TestResult, UserStats, KeyStats, LiveStats, NavigationTab } from './types';
 import { applyGlobalNepaliFont, getStoredNepaliFont } from './utils/fonts';
+import { ensureLokSewaMinimumWords } from './utils/lokSewaEvaluation';
 import {
   NEPALI_WORDS_EASY,
   NEPALI_WORDS_MEDIUM,
@@ -237,44 +238,50 @@ export default function App() {
 
   // Generate Passage Target Text based on options
   const generateTargetText = () => {
+    let text = '';
     if (settings.testType === 'custom' && settings.customText) {
-      return settings.customText;
-    }
-
-    if (settings.testType === 'legal') {
-      return SAMPLE_PARAGRAPHS.supreme_court_judgment;
-    }
-
-    if (settings.testType === 'quote') {
-      return SAMPLE_PARAGRAPHS.general_quote;
-    }
-
-    // Word mode or Time mode randomly sampled corpus
-    let sourceWords: string[] = [];
-    if (settings.language === 'nepali') {
-      if (settings.difficulty === 'easy') sourceWords = NEPALI_WORDS_EASY;
-      else if (settings.difficulty === 'medium') sourceWords = NEPALI_WORDS_MEDIUM;
-      else if (settings.difficulty === 'hard') sourceWords = NEPALI_WORDS_HARD;
-      else sourceWords = NEPALI_WORDS_EXPERT;
+      text = settings.customText;
+    } else if (settings.testType === 'legal') {
+      text = SAMPLE_PARAGRAPHS.supreme_court_judgment;
+    } else if (settings.testType === 'quote') {
+      text = SAMPLE_PARAGRAPHS.general_quote;
     } else {
-      if (settings.difficulty === 'easy') sourceWords = ENGLISH_WORDS_EASY;
-      else sourceWords = ENGLISH_WORDS_MEDIUM;
+      // Word mode or Time mode randomly sampled corpus
+      let sourceWords: string[] = [];
+      if (settings.language === 'nepali') {
+        if (settings.difficulty === 'easy') sourceWords = NEPALI_WORDS_EASY;
+        else if (settings.difficulty === 'medium') sourceWords = NEPALI_WORDS_MEDIUM;
+        else if (settings.difficulty === 'hard') sourceWords = NEPALI_WORDS_HARD;
+        else sourceWords = NEPALI_WORDS_EXPERT;
+      } else {
+        if (settings.difficulty === 'easy') sourceWords = ENGLISH_WORDS_EASY;
+        else sourceWords = ENGLISH_WORDS_MEDIUM;
+      }
+
+      // If Lok Sewa mode, generate at least 350 words so user has continuous 300+ words
+      const defaultCount = settings.lokSewaMode ? 350 : 100;
+      const count = settings.testType === 'words'
+        ? (settings.lokSewaMode ? Math.max(300, settings.wordCount) : settings.wordCount)
+        : defaultCount;
+      const sampled: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const randomIdx = Math.floor(Math.random() * sourceWords.length);
+        sampled.push(sourceWords[randomIdx]);
+      }
+      text = sampled.join(' ');
     }
 
-    const count = settings.testType === 'words' ? settings.wordCount : 100;
-    const sampled: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const randomIdx = Math.floor(Math.random() * sourceWords.length);
-      sampled.push(sourceWords[randomIdx]);
+    if (settings.lokSewaMode) {
+      return ensureLokSewaMinimumWords(text, 300);
     }
-    return sampled.join(' ');
+    return text;
   };
 
   // Generate target text on mount or settings change
   useEffect(() => {
     setTargetText(generateTargetText());
     setActiveResult(null);
-  }, [settings.language, settings.testType, settings.difficulty, settings.wordCount, settings.durationSeconds, settings.customText]);
+  }, [settings.language, settings.testType, settings.difficulty, settings.wordCount, settings.durationSeconds, settings.customText, settings.lokSewaMode]);
 
   const updateSettings = (partial: Partial<TestSettings>) => {
     setSettings(prev => ({ ...prev, ...partial }));

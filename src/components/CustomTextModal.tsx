@@ -45,6 +45,7 @@ import { SAMPLE_PARAGRAPHS, LEGAL_PASSAGES } from '../data/wordPacks';
 import { ENGLISH_PARAGRAPH_TESTS } from '../data/englishCourseData';
 import { FontSelector } from './FontSelector';
 import { LokSewaToggle } from './LokSewaToggle';
+import { ensureLokSewaMinimumWords } from '../utils/lokSewaEvaluation';
 
 interface CustomTextModalProps {
   initialLanguage?: LanguageMode;
@@ -246,6 +247,8 @@ export const CustomTextModal: React.FC<CustomTextModalProps> = ({
   const handleStartTest = () => {
     if (!customText.trim()) return;
 
+    const finalText = lokSewaMode ? ensureLokSewaMinimumWords(customText.trim(), 300) : customText.trim();
+
     const finalMaxMistakes = maxMistakesType === 'none'
       ? null
       : maxMistakesType === 'custom'
@@ -255,7 +258,7 @@ export const CustomTextModal: React.FC<CustomTextModalProps> = ({
     const updatedSettings: Partial<TestSettings> = {
       language,
       testType: 'custom',
-      customText: customText.trim(),
+      customText: finalText,
       lokSewaMode,
       durationSeconds: lokSewaMode ? 300 : effectiveDuration,
       noTimeLimit: lokSewaMode ? false : timerMode === 'no_limit',
@@ -284,7 +287,7 @@ export const CustomTextModal: React.FC<CustomTextModalProps> = ({
       textAreaSize
     };
 
-    onStartCustomTest(customText.trim(), updatedSettings);
+    onStartCustomTest(finalText, updatedSettings);
     onClose();
   };
 

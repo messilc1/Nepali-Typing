@@ -115,3 +115,32 @@ export function calculateLokSewaEvaluation(
 
 export const LOK_SEWA_TOOLTIP_TEXT =
   'Lok Sewa Typing Mode: 5-minute typing test. Score is based on Correct Words Per Minute (CWPM), calculated by deducting wrong words from total words typed. Devanagari requires 25+ CWPM for 2.5 marks; English requires 30+ CWPM for 2.5 marks.';
+
+/**
+ * Ensures any typing passage for Lok Sewa Mode contains at least 300 words.
+ * If the selected or generated passage contains fewer than 300 words, it automatically
+ * repeats complete sentences/paragraphs with proper spacing and punctuation until it reaches at least 300 words.
+ *
+ * @param text The original passage text
+ * @param minWords Minimum required word count (default 300)
+ */
+export function ensureLokSewaMinimumWords(text: string, minWords: number = 300): string {
+  if (!text || !text.trim()) {
+    return text;
+  }
+
+  const cleanText = text.trim();
+  const words = cleanText.split(/\s+/).filter(Boolean);
+
+  if (words.length >= minWords) {
+    return cleanText;
+  }
+
+  // Multiply/repeat complete sentences or paragraphs cleanly with a space separator
+  let expanded = cleanText;
+  while (expanded.split(/\s+/).filter(Boolean).length < minWords) {
+    expanded = `${expanded} ${cleanText}`;
+  }
+
+  return expanded;
+}

@@ -19,7 +19,7 @@ import { validateStrictKeystroke, getNextExpectedKey } from '../utils/strictTypi
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
 import { extractSanitizedWords, areDevanagariWordsEquivalent, isCharacterEquivalent } from '../utils/textNormalizer';
-import { calculateLokSewaEvaluation } from '../utils/lokSewaEvaluation';
+import { calculateLokSewaEvaluation, ensureLokSewaMinimumWords } from '../utils/lokSewaEvaluation';
 import { LokSewaToggle } from './LokSewaToggle';
 
 interface TypingAreaProps {
@@ -105,7 +105,14 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const textContainerRef = useRef<HTMLDivElement>(null);
 
-  const targetWords = useMemo(() => extractSanitizedWords(targetText), [targetText]);
+  const effectiveTargetText = useMemo(() => {
+    if (settings.lokSewaMode) {
+      return ensureLokSewaMinimumWords(targetText, 300);
+    }
+    return targetText;
+  }, [targetText, settings.lokSewaMode]);
+
+  const targetWords = useMemo(() => extractSanitizedWords(effectiveTargetText), [effectiveTargetText]);
 
   // Compute live statistics helper
   const computeLiveStats = useCallback((overrideElapsedSec?: number): LiveStats => {
