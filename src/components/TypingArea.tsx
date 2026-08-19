@@ -1385,13 +1385,13 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           </div>
         )}
 
-        {/* Live Typed Text Preview (Custom Text Mode Only) */}
+        {/* Live Typed Text Preview (Nepali Custom Text Mode Only) */}
         {settings.testType === 'custom' && (
           <div className="mb-4 p-3.5 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-inner">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                Live Typed Text
+                Live Typed Text (Actual Devanagari Output)
               </span>
               {settings.backspaceEnabled === false && (
                 <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
@@ -1400,7 +1400,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
               )}
             </div>
             <div
-              className="font-nepali text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 flex flex-wrap gap-x-2 gap-y-1 max-h-24 overflow-y-auto"
+              className="font-nepali text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 flex flex-wrap items-center gap-x-2 gap-y-1.5 max-h-24 overflow-y-auto"
               style={getFontFamilyStyle()}
             >
               {/* Words typed so far */}
@@ -1421,15 +1421,35 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
                 );
               })}
 
-              {/* Current word actively being typed */}
+              {/* Current word actively being typed with character-level accuracy */}
               {typedInput && (
-                <span className="text-slate-900 dark:text-slate-100 font-bold bg-blue-50 dark:bg-blue-950/60 px-1 rounded border border-blue-200 dark:border-blue-800">
-                  {typedInput}
+                <span className="inline-flex items-center gap-0.5 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                  {typedInput.split('').map((char, charIdx) => {
+                    const expectedChar = currentTargetWord[charIdx];
+                    const isCharMatch = expectedChar === char;
+                    return (
+                      <span
+                        key={charIdx}
+                        className={
+                          isCharMatch
+                            ? 'text-blue-600 dark:text-blue-400 font-bold'
+                            : 'text-rose-600 dark:text-rose-400 font-black bg-rose-100 dark:bg-rose-950 rounded px-0.5 underline decoration-rose-500'
+                        }
+                      >
+                        {char}
+                      </span>
+                    );
+                  })}
+                  {romanBuffer && (
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 ml-1">
+                      ({romanBuffer})
+                    </span>
+                  )}
                 </span>
               )}
 
               {currentWordIndex === 0 && !typedInput && (
-                <span className="text-xs text-slate-400 italic">
+                <span className="text-xs text-slate-400 italic font-sans">
                   Start typing to see live keystroke output here...
                 </span>
               )}

@@ -129,6 +129,7 @@ export function validateStrictKeystroke(params: {
       const isComplete =
         cleanConverted === cleanTarget ||
         areDevanagariWordsEquivalent(cleanConverted, cleanTarget) ||
+        cleanConverted.replace(/्$/, '') === cleanTarget.replace(/्$/, '') ||
         currentBuffer.toLowerCase() === targetRoman.toLowerCase() ||
         (currentBuffer.length >= targetRoman.length && targetRoman.length > 0) ||
         (cleanConverted.length >= cleanTarget.length && cleanTarget.length > 0);
@@ -204,11 +205,12 @@ export function validateStrictKeystroke(params: {
   const targetRoman = getRomanizedHintForWord(cleanTarget);
   const expectedChar = targetRoman[currentBuffer.length] || '';
 
-  // If current word is already finished, reject non-space
-  if (
-    (cleanConverted === cleanTarget || areDevanagariWordsEquivalent(cleanConverted, cleanTarget)) &&
-    !isLastWord
-  ) {
+  // If current word is already finished and matches exact target, reject non-space
+  const isWordAlreadyFinished =
+    cleanConverted === cleanTarget ||
+    (cleanConverted.replace(/्$/, '') === cleanTarget.replace(/्$/, '') && currentBuffer.length >= targetRoman.length);
+
+  if (isWordAlreadyFinished && !isLastWord) {
     return {
       isValid: false,
       newBuffer: currentBuffer,
@@ -229,6 +231,7 @@ export function validateStrictKeystroke(params: {
   // 3. Candidate converted is exact match with cleanTarget
   // 4. Candidate converted (or without trailing virama) is a valid prefix of cleanTarget
   // 5. Direct match with expected Devanagari character (for direct Nepali key inputs)
+  // 6. Direct match with expected character at target position or end of word
   const isDirectMatch =
     pressedKey === expectedChar ||
     isCharacterEquivalent(pressedKey, expectedChar) ||
@@ -247,11 +250,12 @@ export function validateStrictKeystroke(params: {
     cleanTarget.startsWith(candidateConverted.replace(/्$/, '')) ||
     candidateConverted.startsWith(cleanTarget.replace(/्$/, ''));
 
-  // Allow punctuation or direct character match at end of word
-  const isPunctuationMatch =
+  // Allow punctuation or direct character match at current position or end of word
+  const isPunctuationOrSymbolMatch =
+    isCharacterEquivalent(pressedKey, cleanTarget[currentBuffer.length] || '') ||
     isCharacterEquivalent(pressedKey, cleanTarget[cleanTarget.length - 1] || '');
 
-  const isValid = isDirectMatch || isBufferPrefix || isExactWordMatch || isConvertedPrefix || isPunctuationMatch;
+  const isValid = isDirectMatch || isBufferPrefix || isExactWordMatch || isConvertedPrefix || isPunctuationOrSymbolMatch;
 
   if (isValid) {
     const isComplete = isExactWordMatch || candidateBuffer.toLowerCase() === targetRoman.toLowerCase();
