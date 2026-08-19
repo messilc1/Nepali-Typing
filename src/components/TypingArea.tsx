@@ -19,6 +19,8 @@ import { validateStrictKeystroke, getNextExpectedKey } from '../utils/strictTypi
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
 import { extractSanitizedWords, areDevanagariWordsEquivalent, isCharacterEquivalent } from '../utils/textNormalizer';
+import { calculateLokSewaEvaluation } from '../utils/lokSewaEvaluation';
+import { LokSewaToggle } from './LokSewaToggle';
 
 interface TypingAreaProps {
   settings: TestSettings;
@@ -285,6 +287,14 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     const historyLen = typedHistoryRef.current.length;
     const progressPercent = targetWords.length > 0 ? Math.min(100, Math.round((historyLen / targetWords.length) * 100)) : 0;
 
+    const isLokSewa = settings.lokSewaMode === true;
+    const lokEval = calculateLokSewaEvaluation(
+      settings.language,
+      historyLen,
+      liveStats.wrongWords,
+      liveStats.elapsedSeconds
+    );
+
     const liveResult: TestResult = {
       id: sessionIdRef.current,
       timestamp: startTimeRef.current || Date.now(),
@@ -299,6 +309,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       grossWpm: liveStats.grossWpm,
       netWpm: liveStats.netWpm,
       accuracy: liveStats.accuracy,
+      isLokSewaMode: isLokSewa,
+      lokSewaCwpm: lokEval.cwpm,
+      lokSewaMarks: lokEval.marks,
+      lokSewaPassed: lokEval.isPassed,
       totalCharactersTyped: liveStats.totalCharactersTyped,
       correctCharacters: liveStats.correctCharacters,
       wrongCharacters: liveStats.wrongCharacters,
@@ -501,6 +515,14 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     const isTimedOut = settings.testType === 'time' && (finalElapsedSec || elapsedSeconds) >= settings.durationSeconds;
     const sessionStatus: SessionStatus = isTimedOut ? 'Timed Out' : 'Completed';
 
+    const isLokSewa = settings.lokSewaMode === true;
+    const lokEval = calculateLokSewaEvaluation(
+      settings.language,
+      history.length,
+      wrongWords,
+      timeSpent
+    );
+
     const resultObj: TestResult = {
       id: sessionIdRef.current || ('test_' + Date.now()),
       timestamp: startTimeRef.current || Date.now(),
@@ -517,6 +539,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       accuracy,
       finalAccuracy: accuracy,
       keystrokeAccuracy,
+      isLokSewaMode: isLokSewa,
+      lokSewaCwpm: lokEval.cwpm,
+      lokSewaMarks: lokEval.marks,
+      lokSewaPassed: lokEval.isPassed,
       correctedMistakesCount,
       uncorrectedMistakesCount,
       totalCharactersTyped: totalTypedChars,
@@ -1158,6 +1184,18 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
             <Quote className="w-3.5 h-3.5" />
             <span>Quotes</span>
           </button>
+
+          {/* Lok Sewa Exam Mode Toggle */}
+          <div className="ml-1 pl-1 border-l border-slate-200 dark:border-slate-700">
+            <LokSewaToggle
+              isEnabled={!!settings.lokSewaMode}
+              onToggle={(enabled) => updateSettings({
+                lokSewaMode: enabled,
+                ...(enabled ? { testType: 'time', durationSeconds: 300 } : {})
+              })}
+              language={settings.language}
+            />
+          </div>
 
         </div>
 

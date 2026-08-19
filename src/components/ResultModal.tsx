@@ -11,7 +11,9 @@ import {
   Target,
   Clock,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Award,
+  BookOpen
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import confetti from 'canvas-confetti';
@@ -34,16 +36,16 @@ export const ResultModal: React.FC<ResultModalProps> = ({
   onNavigateToImprovement,
   isPersonalBest
 }) => {
-  // Fire confetti if personal best!
+  // Fire confetti if personal best or Lok Sewa full marks!
   useEffect(() => {
-    if (isPersonalBest) {
+    if (isPersonalBest || (result.isLokSewaMode && (result.lokSewaMarks || 0) >= 2.5)) {
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 }
       });
     }
-  }, [isPersonalBest]);
+  }, [isPersonalBest, result.isLokSewaMode, result.lokSewaMarks]);
 
   // Extract top mistyped words/characters
   const mistypedWords = Object.entries(result.mistypedWordsMap || {})
@@ -54,13 +56,22 @@ export const ResultModal: React.FC<ResultModalProps> = ({
 
   // Download PDF / Printable HTML summary report
   const handleDownloadResult = () => {
+    const isLokSewa = result.isLokSewaMode;
     const reportText = `===========================================
-NEPALI TYPING PRO - PERFORMANCE REPORT
+${isLokSewa ? 'LOK SEWA AAYOG IT SKILL TEST - SCORECARD' : 'NEPALI TYPING PRO - PERFORMANCE REPORT'}
 ===========================================
 Date: ${new Date(result.timestamp).toLocaleString()}
 Language Mode: ${result.language.toUpperCase()}
 Test Mode: ${result.testType} (${result.durationSeconds}s)
-
+${isLokSewa ? `\nLOK SEWA OFFICIAL EVALUATION:
+-------------------------------------------
+Correct Words Per Minute (CWPM): ${result.lokSewaCwpm ?? result.netWpm} CWPM
+Lok Sewa Skill Marks: ${(result.lokSewaMarks ?? 0).toFixed(2)} / 2.50
+Status: ${(result.lokSewaMarks ?? 0) >= 2.5 ? 'Full Marks Achieved' : (result.lokSewaMarks ?? 0) >= 1.0 ? 'Passed' : 'Needs Practice'}
+Total Words Typed: ${result.totalWordsTyped}
+Wrong Words (Deducted): ${result.wrongWords}
+Correct Words: ${result.correctWords}
+Evaluation Formula: (${result.totalWordsTyped} - ${result.wrongWords}) ÷ 5 = ${result.lokSewaCwpm ?? result.netWpm} CWPM\n` : ''}
 SPEED & ACCURACY METRICS:
 -------------------------------------------
 Net WPM: ${result.netWpm} WPM
@@ -92,14 +103,19 @@ https://nepalitypingpro.app
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Nepali_Typing_Result_${result.netWpm}WPM_${Date.now()}.txt`;
+    a.download = isLokSewa
+      ? `LokSewa_Typing_Scorecard_${result.lokSewaCwpm || result.netWpm}CWPM_${Date.now()}.txt`
+      : `Nepali_Typing_Result_${result.netWpm}WPM_${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   // Copy result text to clipboard
   const handleShareResult = () => {
-    const text = `🇳🇵 I just typed ${result.netWpm} WPM with ${result.accuracy}% accuracy in Romanized Nepali on Nepali Typing Pro! 🚀 Test your typing speed at https://nepalitypingpro.app`;
+    const isLokSewa = result.isLokSewaMode;
+    const text = isLokSewa
+      ? `🇳🇵 Lok Sewa IT Skill Test Result: I scored ${(result.lokSewaMarks ?? 0).toFixed(2)}/2.50 with ${result.lokSewaCwpm ?? result.netWpm} Correct WPM in ${result.language === 'nepali' ? 'Nepali' : 'English'} on Nepali Typing Pro! 🚀`
+      : `🇳🇵 I just typed ${result.netWpm} WPM with ${result.accuracy}% accuracy in Romanized Nepali on Nepali Typing Pro! 🚀 Test your typing speed at https://nepalitypingpro.app`;
     navigator.clipboard.writeText(text);
     alert('Result summary copied to clipboard!');
   };
@@ -110,12 +126,16 @@ https://nepalitypingpro.app
       {/* Header Banner */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6 mb-8">
         <div>
-          <div className="flex items-center gap-3">
-            {isPersonalBest && (
+          <div className="flex flex-wrap items-center gap-3">
+            {result.isLokSewaMode ? (
+              <span className="flex items-center gap-1.5 px-3 py-1 bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-extrabold text-xs rounded-full border border-rose-300 dark:border-rose-800">
+                <Award className="w-4 h-4 text-rose-600" /> Lok Sewa Exam Evaluation
+              </span>
+            ) : isPersonalBest ? (
               <span className="flex items-center gap-1 px-3 py-1 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-extrabold text-xs rounded-full border border-amber-300">
                 <Trophy className="w-4 h-4 text-amber-500 fill-amber-500" /> New Personal Best!
               </span>
-            )}
+            ) : null}
             <span className={`px-3 py-1 font-bold text-xs rounded-full ${
               result.performanceGrade === 'Excellent'
                 ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
@@ -127,10 +147,10 @@ https://nepalitypingpro.app
             </span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight mt-2">
-            Typing Test Completed
+            {result.isLokSewaMode ? 'Lok Sewa IT Skill Test Result' : 'Typing Test Completed'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            {result.language === 'nepali' ? 'Romanized Nepali Unicode Test' : 'English Test'} • {new Date(result.timestamp).toLocaleTimeString()}
+            {result.language === 'nepali' ? 'Devanagari / Romanized Nepali Unicode' : 'English Touch Typing'} • {new Date(result.timestamp).toLocaleTimeString()}
           </p>
         </div>
 
@@ -138,19 +158,95 @@ https://nepalitypingpro.app
         <div className="flex items-center gap-2">
           <button
             onClick={onRetry}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" />
             <span>Retry (Ctrl+Enter)</span>
           </button>
           <button
             onClick={onNewTest}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold text-sm transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm transition-all cursor-pointer"
           >
             <span>New Test</span>
           </button>
         </div>
       </div>
+
+      {/* Official Lok Sewa Scorecard (When in Lok Sewa Mode) */}
+      {result.isLokSewaMode && (
+        <div className="bg-gradient-to-r from-rose-500/10 via-indigo-500/10 to-amber-500/10 dark:from-rose-950/40 dark:via-indigo-950/40 dark:to-amber-950/40 p-6 rounded-3xl border border-rose-200 dark:border-rose-800/80 mb-8 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-200/60 dark:border-rose-800/40 pb-3">
+            <div className="flex items-center gap-2">
+              <Award className="w-6 h-6 text-rose-600 dark:text-rose-400" />
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                  Lok Sewa Aayog IT Skill Test • Scorecard
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Evaluated with 5-minute standard formula: CWPM = (Total Words Typed − Wrong Words) ÷ 5
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`px-3 py-1 rounded-full text-xs font-black ${
+                (result.lokSewaMarks ?? 0) >= 2.5
+                  ? 'bg-emerald-500 text-white shadow-xs'
+                  : (result.lokSewaMarks ?? 0) >= 1.0
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-rose-600 text-white'
+              }`}>
+                {(result.lokSewaMarks ?? 0) >= 2.5
+                  ? 'FULL MARKS (2.5/2.5)'
+                  : (result.lokSewaMarks ?? 0) >= 1.0
+                  ? 'PASSED'
+                  : 'NEEDS IMPROVEMENT'}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white/90 dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-center">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Correct WPM (CWPM)</span>
+              <div className="text-3xl font-black text-rose-600 dark:text-rose-400 font-mono mt-1">
+                {result.lokSewaCwpm ?? result.netWpm}
+              </div>
+              <span className="text-[10px] text-slate-500 font-bold">
+                {result.language === 'nepali' ? 'Target: 25+ CWPM' : 'Target: 30+ CWPM'}
+              </span>
+            </div>
+
+            <div className="bg-white/90 dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-center">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Obtained Marks</span>
+              <div className="text-3xl font-black text-indigo-600 dark:text-indigo-400 font-mono mt-1">
+                {(result.lokSewaMarks ?? 0).toFixed(2)}
+              </div>
+              <span className="text-[10px] text-slate-500 font-bold">
+                Out of 2.50 Marks
+              </span>
+            </div>
+
+            <div className="bg-white/90 dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-center">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Words Typed</span>
+              <div className="text-2xl font-black text-slate-800 dark:text-slate-200 font-mono mt-1">
+                {result.totalWordsTyped}
+              </div>
+              <span className="text-[10px] text-slate-500">
+                {result.correctWords} correct words
+              </span>
+            </div>
+
+            <div className="bg-white/90 dark:bg-slate-900/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-center">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Wrong Words (Deducted)</span>
+              <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono mt-1">
+                {result.wrongWords}
+              </div>
+              <span className="text-[10px] text-rose-500 font-bold">
+                Deducted from Total
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -377,14 +473,14 @@ https://nepalitypingpro.app
         <div className="flex items-center gap-2">
           <button
             onClick={handleDownloadResult}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition-all cursor-pointer"
           >
             <Download className="w-4 h-4 text-blue-600" />
             <span>Download Result (TXT / PDF)</span>
           </button>
           <button
             onClick={handleShareResult}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition-all cursor-pointer"
           >
             <Share2 className="w-4 h-4 text-emerald-600" />
             <span>Share Result</span>

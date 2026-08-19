@@ -11,6 +11,8 @@ import {
   SessionStatus
 } from '../../types';
 import { EnglishKeyboardGuide } from './EnglishKeyboardGuide';
+import { LokSewaToggle } from '../LokSewaToggle';
+import { calculateLokSewaEvaluation } from '../../utils/lokSewaEvaluation';
 import {
   Clock,
   Zap,
@@ -27,7 +29,8 @@ import {
   VolumeX,
   Keyboard as KeyboardIcon,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 import { sanitizeTargetText, isCharacterEquivalent } from '../../utils/textNormalizer';
 
@@ -46,6 +49,7 @@ interface EnglishTypingPlayerProps {
   backspaceEnabled?: boolean;
   noTimeLimit?: boolean;
   showHints?: boolean;
+  isLokSewaMode?: boolean;
   onComplete: (result: TestResult, passedLesson?: boolean, stars?: number) => void;
   onExit: () => void;
   onNextLesson?: () => void;
@@ -66,10 +70,14 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
   backspaceEnabled = true,
   noTimeLimit = false,
   showHints = true,
+  isLokSewaMode = false,
   onComplete,
   onExit,
   onNextLesson
 }) => {
+  // Lok Sewa mode local toggle state
+  const [lokSewaActive, setLokSewaActive] = useState<boolean>(isLokSewaMode);
+
   // Determine target text
   const targetText = useMemo(() => {
     let raw = 'The quick brown fox jumps over the lazy dog.';
@@ -82,6 +90,66 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
   }, [customText, lesson, paragraphTest, practiceModule, improvementDrill]);
 
   const targetChars = useMemo(() => targetText.split(''), [targetText]);
+
+  // Tokenize text into words, spaces, and newlines so words never split across lines
+  const renderedTokens = useMemo(() => {
+    interface TextToken {
+      type: 'word' | 'space' | 'newline';
+      startIndex: number;
+      chars: { char: string; index: number }[];
+    }
+    const tokens: TextToken[] = [];
+    let currentWordChars: { char: string; index: number }[] = [];
+    let currentWordStart = 0;
+
+    for (let i = 0; i < targetChars.length; i++) {
+      const char = targetChars[i];
+      if (char === ' ') {
+        if (currentWordChars.length > 0) {
+          tokens.push({
+            type: 'word',
+            startIndex: currentWordStart,
+            chars: currentWordChars
+          });
+          currentWordChars = [];
+        }
+        tokens.push({
+          type: 'space',
+          startIndex: i,
+          chars: [{ char, index: i }]
+        });
+      } else if (char === '\n') {
+        if (currentWordChars.length > 0) {
+          tokens.push({
+            type: 'word',
+            startIndex: currentWordStart,
+            chars: currentWordChars
+          });
+          currentWordChars = [];
+        }
+        tokens.push({
+          type: 'newline',
+          startIndex: i,
+          chars: [{ char, index: i }]
+        });
+      } else {
+        if (currentWordChars.length === 0) {
+          currentWordStart = i;
+        }
+        currentWordChars.push({ char, index: i });
+      }
+    }
+
+    if (currentWordChars.length > 0) {
+      tokens.push({
+        type: 'word',
+        startIndex: currentWordStart,
+        chars: currentWordChars
+      });
+    }
+
+    return tokens;
+  }, [targetChars]);
 
   // Typing state
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -213,14 +281,27 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     const accuracy = totalTyped > 0 ? Math.round((correctCharsCount / totalTyped) * 100) : 100;
     const progressPercent = Math.min(100, Math.round((currentIndex / targetChars.length) * 100));
 
+    // Lok Sewa live evaluation
+    const targetWordsList = targetText.split(/\s+/).filter(Boolean);
+    const currentTypedString = typedChars.map(c => c.char).join('');
+    const currentTypedWords = currentTypedString.split(/\s+/).filter(Boolean);
+    const totalWordsTyped = currentTypedWords.length;
+    const wrongWords = currentTypedWords.filter((w, idx) => idx < targetWordsList.length && w !== targetWordsList[idx]).length;
+    const correctWords = Math.max(0, totalWordsTyped - wrongWords);
+    const lokSewaEval = calculateLokSewaEvaluation('english', totalWordsTyped, wrongWords, elapsedSeconds);
+
     return {
       grossWpm,
       netWpm,
       accuracy: Math.min(100, Math.max(0, accuracy)),
       progressPercent,
-      correctCharsCount
+      correctCharsCount,
+      totalWordsTyped,
+      wrongWords,
+      correctWords,
+      lokSewaEval
     };
-  }, [elapsedSeconds, typedChars, mistakeCount, currentIndex, targetChars.length]);
+  }, [elapsedSeconds, typedChars, mistakeCount, currentIndex, targetChars.length, targetText]);
 
   // Finish session calculation & saving
   const finishSession = useCallback(() => {
@@ -234,6 +315,16 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     const accuracy = totalKeystrokes > 0 ? Math.round((correctCharsCount / totalKeystrokes) * 100) : 100;
     const netWpm = Math.max(0, Math.round(correctCharsCount / 5 / timeInMinutes));
     const grossWpm = Math.round(totalKeystrokes / 5 / timeInMinutes);
+
+    // Word counts
+    const targetWordsList = targetText.split(/\s+/).filter(Boolean);
+    const finalTypedString = typedChars.map(c => c.char).join('');
+    const finalTypedWords = finalTypedString.split(/\s+/).filter(Boolean);
+    const totalWordsTyped = finalTypedWords.length;
+    const wrongWords = finalTypedWords.filter((w, idx) => idx < targetWordsList.length && w !== targetWordsList[idx]).length;
+    const correctWords = Math.max(0, totalWordsTyped - wrongWords);
+
+    const lokSewaEval = calculateLokSewaEvaluation('english', totalWordsTyped, wrongWords, duration);
 
     // Calculate stars and pass status for lessons
     let passed = true;
@@ -270,9 +361,9 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       totalCharactersTyped: totalKeystrokes,
       correctCharacters: correctCharsCount,
       wrongCharacters: mistakeCount,
-      totalWordsTyped: Math.round(correctCharsCount / 5),
-      correctWords: Math.round(correctCharsCount / 5),
-      wrongWords: 0,
+      totalWordsTyped,
+      correctWords,
+      wrongWords,
       mistakesCount: mistakeCount,
       backspacesCount: backspaceCount,
       consistencyPercent: 90,
@@ -287,11 +378,18 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       wordErrors: detailedWordErrorsRef.current,
       charErrors: detailedCharErrorsRef.current,
       sampleText: targetText,
-      categoryOrTitle: lesson?.title || paragraphTest?.title || practiceModule?.title || improvementDrill?.title || 'English Practice'
+      categoryOrTitle: lesson?.title || paragraphTest?.title || practiceModule?.title || improvementDrill?.title || (lokSewaActive ? 'Lok Sewa English Skill Test' : 'English Practice'),
+      isLokSewaMode: lokSewaActive,
+      lokSewaCwpm: lokSewaEval.cwpm,
+      lokSewaMarks: lokSewaEval.marks,
+      lokSewaPassed: lokSewaEval.marks >= 1.0
     };
 
     onComplete(testResult, passed, stars);
-  }, [elapsedSeconds, typedChars, mistakeCount, backspaceCount, lesson, paragraphTest, practiceModule, improvementDrill, modeType, onComplete]);
+  }, [elapsedSeconds, typedChars, mistakeCount, backspaceCount, lesson, paragraphTest, practiceModule, improvementDrill, modeType, onComplete, targetText, lokSewaActive]);
+
+  // Effective time limit (300 seconds if Lok Sewa mode is active)
+  const effectiveTimeLimit = lokSewaActive ? 300 : timeLimitSeconds;
 
   // Timer effect
   useEffect(() => {
@@ -302,7 +400,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         setElapsedSeconds(seconds);
 
         // Check time limit
-        if (!noTimeLimit && timeLimitSeconds && timeLimitSeconds > 0 && seconds >= timeLimitSeconds) {
+        if (!noTimeLimit && effectiveTimeLimit && effectiveTimeLimit > 0 && seconds >= effectiveTimeLimit) {
           finishSession();
         }
       }, 250);
@@ -312,7 +410,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [hasStarted, isFinished, timeLimitSeconds, noTimeLimit, finishSession]);
+  }, [hasStarted, isFinished, effectiveTimeLimit, noTimeLimit, finishSession]);
 
   // Keydown handler
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -481,15 +579,32 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
           <div>
             <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <span>{lesson?.title || paragraphTest?.title || practiceModule?.title || improvementDrill?.title || (customText ? 'Custom English Text' : 'English Typing Practice')}</span>
+              {lokSewaActive && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs animate-pulse">
+                  LOK SEWA EXAM
+                </span>
+              )}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {lesson?.subtitle || paragraphTest?.category || practiceModule?.description || improvementDrill?.stageName || (customText ? 'User Provided Custom Practice' : 'Touch Typing Precision')}
+              {lokSewaActive
+                ? '5-Minute Official Skill Test Standard • 30+ CWPM Full Marks Threshold'
+                : lesson?.subtitle || paragraphTest?.category || practiceModule?.description || improvementDrill?.stageName || (customText ? 'User Provided Custom Practice' : 'Touch Typing Precision')}
             </p>
           </div>
         </div>
 
         {/* Live Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Lok Sewa Toggle */}
+          <LokSewaToggle
+            isLokSewaMode={lokSewaActive}
+            onToggle={(active) => {
+              setLokSewaActive(active);
+              handleRestart();
+            }}
+            language="english"
+          />
+
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
             className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
@@ -508,6 +623,39 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         </div>
       </div>
 
+      {/* Lok Sewa Mode Live Banner (when active) */}
+      {lokSewaActive && (
+        <div className="bg-gradient-to-r from-rose-600 to-indigo-600 text-white p-3 sm:p-4 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-xs">
+              <Award className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-black flex items-center gap-2">
+                <span>Lok Sewa Aayog IT Skill Test • English Typing (5:00)</span>
+              </div>
+              <div className="text-[11px] text-rose-100 font-medium">
+                Target: 30+ Correct WPM = 2.50 Marks (Formula: CWPM = [Total Words − Wrong Words] ÷ 5)
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-right bg-black/20 px-3 py-1.5 rounded-xl backdrop-blur-xs">
+            <div>
+              <div className="text-[10px] uppercase font-bold text-rose-200">Current CWPM</div>
+              <div className="text-lg sm:text-xl font-black font-mono leading-none">
+                {liveStats.lokSewaEval.cwpm}
+              </div>
+            </div>
+            <div className="border-l border-white/20 pl-3">
+              <div className="text-[10px] uppercase font-bold text-rose-200">Est. Marks</div>
+              <div className="text-lg sm:text-xl font-black font-mono leading-none text-amber-300">
+                {liveStats.lokSewaEval.marks.toFixed(2)} <span className="text-xs font-normal text-white">/ 2.50</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Live Heads-Up Dashboard (WPM, Accuracy, Time, Mistakes) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
@@ -515,9 +663,11 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
             <Zap className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Speed</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              {lokSewaActive ? 'Correct WPM' : 'Speed'}
+            </span>
             <div className="text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
-              {liveStats.netWpm} <span className="text-xs font-bold text-slate-500">WPM</span>
+              {lokSewaActive ? liveStats.lokSewaEval.cwpm : liveStats.netWpm} <span className="text-xs font-bold text-slate-500">WPM</span>
             </div>
           </div>
         </div>
@@ -541,9 +691,9 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Time</span>
             <div className="text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
-              {timeLimitSeconds
-                ? `${Math.max(0, timeLimitSeconds - elapsedSeconds)}s`
-                : `${elapsedSeconds}s`}
+              {effectiveTimeLimit
+                ? `${Math.floor(Math.max(0, effectiveTimeLimit - elapsedSeconds) / 60)}:${String(Math.max(0, effectiveTimeLimit - elapsedSeconds) % 60).padStart(2, '0')}`
+                : `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`}
             </div>
           </div>
         </div>
@@ -553,9 +703,11 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Mistakes</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              {lokSewaActive ? 'Wrong Words' : 'Mistakes'}
+            </span>
             <div className="text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
-              {mistakeCount} <span className="text-[10px] font-bold text-slate-400">({backspaceCount} ⌫)</span>
+              {lokSewaActive ? liveStats.wrongWords : mistakeCount} <span className="text-[10px] font-bold text-slate-400">({backspaceCount} ⌫)</span>
             </div>
           </div>
         </div>
@@ -606,7 +758,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         </div>
       )}
 
-      {/* Interactive Text Display Canvas */}
+      {/* Interactive Text Display Canvas with Natural Word Wrapping */}
       <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 relative select-none">
         
         {/* Progress Bar */}
@@ -617,31 +769,61 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
           />
         </div>
 
-        {/* Typing Characters Stream with Auto-Scroll Tracking */}
+        {/* Typing Characters Stream with Word-Level Wrap and Auto-Scroll */}
         <div
           ref={textContainerRef}
-          className="relative text-xl sm:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] max-h-[260px] overflow-y-auto p-4 pb-28 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none scroll-smooth whitespace-pre-wrap select-none"
+          className="relative text-xl sm:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] max-h-[260px] overflow-y-auto overflow-x-hidden p-4 pb-28 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none scroll-smooth select-none w-full break-words [word-break:break-word]"
         >
-          {targetChars.map((char, index) => {
-            const isTyped = index < currentIndex;
-            const isCurrent = index === currentIndex;
+          {renderedTokens.map((token) => {
+            if (token.type === 'word') {
+              return (
+                <span key={token.startIndex} className="inline-block whitespace-nowrap">
+                  {token.chars.map((c) => {
+                    const isTyped = c.index < currentIndex;
+                    const isCurrent = c.index === currentIndex;
+                    let charClass = 'text-slate-400 dark:text-slate-500';
 
-            if (char === ' ') {
+                    if (isTyped) {
+                      charClass = 'text-emerald-600 dark:text-emerald-400 font-semibold';
+                    } else if (isCurrent) {
+                      charClass =
+                        'bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse inline-block';
+                    }
+
+                    return (
+                      <span
+                        key={c.index}
+                        ref={isCurrent ? activeCharRef : null}
+                        className={`transition-colors ${charClass}`}
+                      >
+                        {c.char}
+                      </span>
+                    );
+                  })}
+                </span>
+              );
+            }
+
+            if (token.type === 'space') {
+              const isTyped = token.startIndex < currentIndex;
+              const isCurrent = token.startIndex === currentIndex;
+
               if (isCurrent) {
                 return (
                   <span
-                    key={index}
+                    key={token.startIndex}
                     ref={activeCharRef}
-                    className="bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse whitespace-pre inline-block"
+                    className="inline-block bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse mx-0.5"
                   >
                     ␣
                   </span>
                 );
               }
+
               return (
                 <span
-                  key={index}
-                  className={`whitespace-pre ${
+                  key={token.startIndex}
+                  className={`inline-block whitespace-pre ${
                     isTyped
                       ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
                       : 'text-slate-400 dark:text-slate-500'
@@ -652,49 +834,23 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
               );
             }
 
-            if (char === '\n') {
-              if (isCurrent) {
-                return (
-                  <span
-                    key={index}
-                    ref={activeCharRef}
-                    className="bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse text-xs whitespace-pre inline-block"
-                  >
-                    ↵{'\n'}
-                  </span>
-                );
-              }
+            if (token.type === 'newline') {
+              const isCurrent = token.startIndex === currentIndex;
               return (
-                <span
-                  key={index}
-                  className={`text-xs whitespace-pre ${
-                    isTyped
-                      ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                      : 'text-slate-300 dark:text-slate-600 opacity-60'
-                  }`}
-                >
-                  ↵{'\n'}
+                <span key={token.startIndex} className="block w-full h-3 my-0.5">
+                  {isCurrent && (
+                    <span
+                      ref={activeCharRef}
+                      className="inline-block bg-blue-600 text-white font-extrabold px-1.5 py-0.5 rounded text-xs shadow-sm ring-2 ring-blue-400 animate-pulse font-mono"
+                    >
+                      ↵ Enter
+                    </span>
+                  )}
                 </span>
               );
             }
 
-            let charClass = 'text-slate-400 dark:text-slate-500';
-
-            if (isTyped) {
-              charClass = 'text-emerald-600 dark:text-emerald-400 font-semibold';
-            } else if (isCurrent) {
-              charClass = 'bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse inline-block';
-            }
-
-            return (
-              <span
-                key={index}
-                ref={isCurrent ? activeCharRef : null}
-                className={`transition-colors whitespace-pre ${charClass}`}
-              >
-                {char}
-              </span>
-            );
+            return null;
           })}
         </div>
 
@@ -769,15 +925,56 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
                 <Award className="w-10 h-10" />
               </div>
               <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">
-                Exercise Completed!
+                {lokSewaActive ? 'Lok Sewa Exam Evaluated!' : 'Exercise Completed!'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {lesson?.title || paragraphTest?.title || 'Session results and permanent accuracy breakdown'}
+                {lokSewaActive
+                  ? 'Official Lok Sewa Aayog IT Skill Test Evaluation • English Typing'
+                  : lesson?.title || paragraphTest?.title || 'Session results and permanent accuracy breakdown'}
               </p>
             </div>
 
-            {/* Stars & Lesson Evaluation (If Lesson Mode) */}
-            {lesson && (
+            {/* Lok Sewa Official Scorecard */}
+            {lokSewaActive && (
+              <div className="bg-gradient-to-br from-rose-50 to-indigo-50/70 dark:from-rose-950/40 dark:to-indigo-950/40 p-4 sm:p-5 rounded-2xl border border-rose-200 dark:border-rose-800/60 space-y-3 text-center">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 border-b border-rose-200/60 dark:border-rose-800/40 pb-2">
+                  <span>Lok Sewa Marks</span>
+                  <span className="font-extrabold text-rose-600 dark:text-rose-400">
+                    {liveStats.lokSewaEval.marks >= 2.5
+                      ? 'Full Marks (2.5/2.5)'
+                      : liveStats.lokSewaEval.marks >= 1.0
+                      ? 'Passed'
+                      : 'Needs Improvement'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="bg-white/80 dark:bg-slate-900/80 p-3 rounded-xl border border-rose-100 dark:border-rose-900/50">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Correct WPM (CWPM)</span>
+                    <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono mt-0.5">
+                      {liveStats.lokSewaEval.cwpm}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 dark:bg-slate-900/80 p-3 rounded-xl border border-rose-100 dark:border-rose-900/50">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Skill Test Marks</span>
+                    <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">
+                      {liveStats.lokSewaEval.marks.toFixed(2)} <span className="text-xs font-bold text-slate-400">/ 2.50</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-600 dark:text-slate-300 font-mono bg-white/60 dark:bg-slate-900/60 p-2 rounded-lg text-left space-y-0.5">
+                  <div>• Total Words Typed: <strong>{liveStats.totalWordsTyped}</strong></div>
+                  <div>• Wrong Words: <strong>{liveStats.wrongWords}</strong> (deducted)</div>
+                  <div>• Correct Words: <strong>{liveStats.correctWords}</strong></div>
+                  <div>• Formula: <code>({liveStats.totalWordsTyped} − {liveStats.wrongWords}) ÷ 5 = {liveStats.lokSewaEval.cwpm} CWPM</code></div>
+                </div>
+              </div>
+            )}
+
+            {/* Stars & Lesson Evaluation (If Lesson Mode and NOT Lok Sewa) */}
+            {!lokSewaActive && lesson && (
               <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/80 text-center space-y-2">
                 <div className="flex justify-center gap-2 text-2xl">
                   <Star className={`w-8 h-8 ${liveStats.accuracy >= 80 ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`} />

@@ -806,6 +806,41 @@ export const EnglishTypingSection: React.FC<EnglishTypingSectionProps> = ({
             </p>
           </div>
 
+          {/* Lok Sewa 5-Minute Exam Card */}
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-blue-950/30 p-6 rounded-3xl border-2 border-emerald-300 dark:border-emerald-700 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-black tracking-wide uppercase flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Official Exam Mode
+                </span>
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                  Lok Sewa Aayog (PSC Nepal) IT Skill Test
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-slate-100">
+                5-Minute English Lok Sewa Typing Exam
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                Standard 5-minute exam simulation. Evaluated using the official formula: <code className="font-mono font-bold bg-white/80 dark:bg-slate-900/80 px-1.5 py-0.5 rounded">CWPM = (Total Words − Wrong Words) ÷ 5</code>. 30+ CWPM earns full marks (2.5 / 2.5).
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setActivePlayerMode({
+                  type: 'quick-test',
+                  timeLimitSeconds: 300,
+                  customText: ENGLISH_PARAGRAPH_TESTS[0].text
+                });
+              }}
+              className="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-md transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>Launch 5-Min Lok Sewa Exam</span>
+            </button>
+          </div>
+
           {/* Quick Timed Tests Bar */}
           <div className="bg-white dark:bg-slate-800/90 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
             <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">

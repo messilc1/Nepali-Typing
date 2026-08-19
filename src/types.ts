@@ -14,6 +14,9 @@ export interface LiveStats {
   correctWords: number;
   wrongWords: number;
   consistency: number;
+  lokSewaCwpm?: number;
+  lokSewaMarks?: number;
+  isLokSewaMode?: boolean;
 }
 
 export type NavigationTab = 'test' | 'english' | 'arena' | 'practice' | 'improvement' | 'legal' | 'analytics' | 'certification' | 'about';
@@ -117,6 +120,7 @@ export interface TestSettings {
   recordCorrectedMistakes?: boolean;
   lineSpacing?: 'normal' | 'relaxed' | 'loose';
   textAreaSize?: 'compact' | 'standard' | 'spacious';
+  lokSewaMode?: boolean;
 }
 
 export interface KeyStats {
@@ -192,6 +196,10 @@ export interface TestResult {
   charErrors?: DetailedCharError[];
   sampleText: string;
   categoryOrTitle?: string;
+  isLokSewaMode?: boolean;
+  lokSewaCwpm?: number;
+  lokSewaMarks?: number;
+  lokSewaPassed?: boolean;
 }
 
 export interface LegalTerm {

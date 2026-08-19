@@ -44,6 +44,7 @@ import {
 import { SAMPLE_PARAGRAPHS, LEGAL_PASSAGES } from '../data/wordPacks';
 import { ENGLISH_PARAGRAPH_TESTS } from '../data/englishCourseData';
 import { FontSelector } from './FontSelector';
+import { LokSewaToggle } from './LokSewaToggle';
 
 interface CustomTextModalProps {
   initialLanguage?: LanguageMode;
@@ -78,6 +79,7 @@ export const CustomTextModal: React.FC<CustomTextModalProps> = ({
   const [selectedDuration, setSelectedDuration] = useState<number>(currentSettings.durationSeconds || 60);
   const [customTimeInput, setCustomTimeInput] = useState<string>('90');
   const [customTimeUnit, setCustomTimeUnit] = useState<'sec' | 'min'>('sec');
+  const [lokSewaMode, setLokSewaMode] = useState<boolean>(currentSettings.lokSewaMode || false);
 
   // Advanced Settings State
   const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
@@ -254,8 +256,9 @@ export const CustomTextModal: React.FC<CustomTextModalProps> = ({
       language,
       testType: 'custom',
       customText: customText.trim(),
-      durationSeconds: effectiveDuration,
-      noTimeLimit: timerMode === 'no_limit',
+      lokSewaMode,
+      durationSeconds: lokSewaMode ? 300 : effectiveDuration,
+      noTimeLimit: lokSewaMode ? false : timerMode === 'no_limit',
       mistakeMode,
       maxMistakes: finalMaxMistakes,
       maxMistakesAction,
@@ -309,6 +312,19 @@ export const CustomTextModal: React.FC<CustomTextModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Lok Sewa Exam Mode Toggle */}
+            <LokSewaToggle
+              isEnabled={lokSewaMode}
+              onToggle={(enabled) => {
+                setLokSewaMode(enabled);
+                if (enabled) {
+                  setTimerMode('preset');
+                  setSelectedDuration(300);
+                }
+              }}
+              language={language}
+            />
+
             {/* Language Switcher */}
             <div className="flex items-center bg-slate-200 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
               <button
