@@ -27,6 +27,7 @@ import confetti from 'canvas-confetti';
 import { CertificationUser, CertificationAttempt, CertificationTestScore } from '../types';
 import { transliterateRomanToNepali } from '../utils/nepaliTransliteration';
 import { OfficialCertificateDocument } from './OfficialCertificateDocument';
+import { ArrowLeft } from 'lucide-react';
 
 // Standardized Certification Test Passages
 // Test 1: Non-continuous zigzag single character array (Consonants, Vowels, Matras, Numbers, Conjuncts)
@@ -38,7 +39,11 @@ const WORD_PHRASE_TEST_TEXT = "नेपाल संविधान सर्�
 // Test 3: Official 150-word legal and administrative paragraph examination
 const ADVANCED_PARAGRAPH_TEST_TEXT = "नेपालको संविधान बमोजिम कानुनको शासन, शक्ति पृथकीकरण तथा नियन्त्रण र सन्तुलनको सिद्धान्त अनुरुप स्वतन्त्र, निष्पक्ष र सक्षम न्यायपालिकाको स्थापना गरिएको छ। सर्वोच्च अदालतले संविधान र कानुनको अन्तिम व्याख्या गर्ने अधिकार राख्दछ। नागरिकका मौलिक अधिकारको संरक्षण र कानुनी हकको प्रचलन गराउन अदालत सदैव प्रतिबद्ध छ। सार्वजनिक प्रशासनलाई निष्पक्ष, पारदर्शी, भ्रष्टाचारमुक्त, प्रविधिमैत्री र जनउत्तरदायी बनाउन कानुनी व्यवस्था कडाइका साथ लागू गर्नुपर्दछ। निजामती सेवालाई सक्षम, सुदृढ, सेवामूलक र व्यावसायिक बनाउँदै राज्यका सम्पूर्ण अङ्गहरूमा सुशासन कायम गर्नु आजको मुख्य आवश्यकता हो। लोक सेवा आयोगले निष्पक्षता, योग्यता र पारदर्शिताका सिद्धान्तमा आधारित भई सार्वजनिक सेवाका लागि दक्ष जनशक्तिको छनोट गर्दछ। सरकारी कर्मचारीहरूले निष्ठापूर्वक आफ्नो कर्तव्य पालना गर्दै नागरिक सेवामा समर्पित हुनुपर्दछ। विद्युतीय शासन र आधुनिक प्रविधिको प्रयोगले सरकारी सेवा प्रवाहमा शीघ्रता र मितव्ययिता ल्याउँदछ। कानुनी साक्षरता र सचेतना बढाएर मात्र समाजमा शान्ति, सुव्यवस्था र न्यायको प्रत्याभूति गर्न सकिन्छ। त्यसैले सम्पूर्ण सरोकारवालाहरूले कानुनी दायित्व पूरा गर्दै सुशासित नेपाल निर्माणमा योगदान पुर्याउनुपर्दछ।";
 
-export const CertificationView: React.FC = () => {
+interface CertificationViewProps {
+  onBack?: () => void;
+}
+
+export const CertificationView: React.FC<CertificationViewProps> = ({ onBack }) => {
   // User Registration State
   const [user, setUser] = useState<CertificationUser | null>(() => {
     try {
@@ -388,9 +393,20 @@ export const CertificationView: React.FC = () => {
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-slate-950/10 text-slate-950 font-black text-xs rounded-full border border-slate-950/20 w-max mb-3">
-              <Award className="w-4 h-4 text-slate-950" />
-              <span>National Typing Proficiency Certificate (NTPC)</span>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-slate-950/20 hover:bg-slate-950/30 text-slate-950 font-black text-xs rounded-full border border-slate-950/30 transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>← Back to Typing Engine</span>
+                </button>
+              )}
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-950/10 text-slate-950 font-black text-xs rounded-full border border-slate-950/20 w-max">
+                <Award className="w-4 h-4 text-slate-950" />
+                <span>National Typing Proficiency Certificate (NTPC)</span>
+              </div>
             </div>
             <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-950">
               🏆 Official Certification Examination

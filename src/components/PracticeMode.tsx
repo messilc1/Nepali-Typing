@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, CheckCircle2, RotateCcw, Sparkles, Award, Scale, RefreshCw, Play, Filter, Keyboard as KeyboardIcon } from 'lucide-react';
+import { BookOpen, CheckCircle2, RotateCcw, Sparkles, Award, Scale, RefreshCw, Play, Filter, Keyboard as KeyboardIcon, ArrowLeft } from 'lucide-react';
 import { PRACTICE_MODULES, LEGAL_TERMS_PACK } from '../data/wordPacks';
 import { TestSettings, LegalTerm } from '../types';
 import { transliterateWordRuleBased } from '../utils/nepaliTransliteration';
@@ -10,11 +10,13 @@ import { NepaliRomanizedKeyboardDiagram } from './NepaliRomanizedKeyboardDiagram
 interface PracticeModeProps {
   settings: TestSettings;
   onLaunchPracticeSession: (items: string[]) => void;
+  onBack?: () => void;
 }
 
 export const PracticeMode: React.FC<PracticeModeProps> = ({
   settings,
-  onLaunchPracticeSession
+  onLaunchPracticeSession,
+  onBack
 }) => {
   const [selectedModuleId, setSelectedModuleId] = useState<string>('vowels');
   const [selectedLegalCat, setSelectedLegalCat] = useState<string>('All');
@@ -170,6 +172,17 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       
       {/* Module Selector Header */}
       <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+        {onBack && (
+          <div className="pb-2">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-extrabold text-xs transition-all cursor-pointer border border-slate-200 dark:border-slate-600 shadow-xs"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>← Back to Typing Engine</span>
+            </button>
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400">

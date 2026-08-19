@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Scale, Search, BookOpen, Play, CheckCircle2, Clock, Filter, Sparkles, Award } from 'lucide-react';
+import { Scale, Search, BookOpen, Play, CheckCircle2, Clock, Filter, Sparkles, Award, ArrowLeft } from 'lucide-react';
 import { LEGAL_PASSAGES } from '../data/wordPacks';
 import { LegalPassage } from '../types';
 
 interface LegalPackViewProps {
   onStartLegalTest: (passageText: string, passageTitle?: string) => void;
+  onBack?: () => void;
 }
 
 export const LegalPackView: React.FC<LegalPackViewProps> = ({
-  onStartLegalTest
+  onStartLegalTest,
+  onBack
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -81,6 +83,17 @@ export const LegalPackView: React.FC<LegalPackViewProps> = ({
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
         
         <div className="relative z-10 max-w-3xl">
+          {onBack && (
+            <div className="mb-4">
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-extrabold text-xs transition-all cursor-pointer border border-white/20"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>← Back to Typing Test</span>
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2 px-3.5 py-1 bg-amber-400/20 text-amber-300 font-extrabold text-xs rounded-full border border-amber-400/30 w-max mb-4">
             <Scale className="w-4 h-4 text-amber-300" />
             <span>Lok Sewa Aayog & Judiciary Examination Special</span>

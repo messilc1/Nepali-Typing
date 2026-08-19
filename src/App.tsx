@@ -73,13 +73,71 @@ export default function App() {
     return DEFAULT_SETTINGS;
   });
 
-  const [userStats, setUserStats] = useState<UserStats>(() => {
+  // Separate Nepali and English Analytics User Stats
+  const [nepaliUserStats, setNepaliUserStats] = useState<UserStats>(() => {
     const saved = localStorage.getItem('nepali_typing_user_stats');
     if (saved) {
-      try { return { ...INITIAL_USER_STATS, ...JSON.parse(saved) }; } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        const nepaliHistory = (parsed.history || []).filter((h: TestResult) => h.language !== 'english');
+        return { ...INITIAL_USER_STATS, ...parsed, history: nepaliHistory };
+      } catch (e) {}
     }
     return INITIAL_USER_STATS;
   });
+
+  const [englishUserStats, setEnglishUserStats] = useState<UserStats>(() => {
+    const saved = localStorage.getItem('nepali_typing_english_user_stats');
+    if (saved) {
+      try {
+        return { ...INITIAL_USER_STATS, ...JSON.parse(saved) };
+      } catch (e) {}
+    }
+    try {
+      const legacySaved = localStorage.getItem('nepali_typing_user_stats');
+      if (legacySaved) {
+        const parsed = JSON.parse(legacySaved);
+        const englishHistory = (parsed.history || []).filter((h: TestResult) => h.language === 'english');
+        if (englishHistory.length > 0) {
+          const totalTests = englishHistory.length;
+          const totalTime = englishHistory.reduce((acc: number, h: TestResult) => acc + (h.elapsedSeconds || 0), 0);
+          const highest = Math.max(0, ...englishHistory.map((h: TestResult) => h.netWpm));
+          const avgWpm = Math.round(englishHistory.reduce((acc: number, h: TestResult) => acc + h.netWpm, 0) / totalTests);
+          const avgAcc = Math.round(englishHistory.reduce((acc: number, h: TestResult) => acc + h.accuracy, 0) / totalTests);
+          return {
+            ...INITIAL_USER_STATS,
+            totalTestsCompleted: totalTests,
+            totalTimeSpentSeconds: totalTime,
+            highestWpm: highest,
+            averageWpm: avgWpm,
+            averageAccuracy: avgAcc,
+            history: englishHistory
+          };
+        }
+      }
+    } catch {}
+    return INITIAL_USER_STATS;
+  });
+
+  // Analytics view active language selector ('nepali' | 'english')
+  const [analyticsLanguage, setAnalyticsLanguage] = useState<'nepali' | 'english'>('nepali');
+
+  // Alias userStats for current language/global components
+  const activeUserStats = settings.language === 'english' ? englishUserStats : nepaliUserStats;
+
+  // Persist Nepali User Stats
+  useEffect(() => {
+    try {
+      localStorage.setItem('nepali_typing_user_stats', JSON.stringify(nepaliUserStats));
+    } catch (e) {}
+  }, [nepaliUserStats]);
+
+  // Persist English User Stats
+  useEffect(() => {
+    try {
+      localStorage.setItem('nepali_typing_english_user_stats', JSON.stringify(englishUserStats));
+    } catch (e) {}
+  }, [englishUserStats]);
 
   // Navigation & Modals State - Tab Persistence Logic
   const [activeTab, setActiveTabState] = useState<NavigationTab>(() => {
@@ -166,11 +224,6 @@ export default function App() {
     }
   }, [settings.fontFamily]);
 
-  // Persist User Stats
-  useEffect(() => {
-    localStorage.setItem('nepali_typing_user_stats', JSON.stringify(userStats));
-  }, [userStats]);
-
   // Apply Theme Classes
   useEffect(() => {
     const root = document.documentElement;
@@ -250,11 +303,15 @@ export default function App() {
   // Test Complete Handler
   const handleTestComplete = (result: TestResult) => {
     setActiveResult(result);
-    const newHighest = result.netWpm > userStats.highestWpm;
+    const isEnglish = result.language === 'english';
+    const currentStats = isEnglish ? englishUserStats : nepaliUserStats;
+    const setStats = isEnglish ? setEnglishUserStats : setNepaliUserStats;
+
+    const newHighest = result.netWpm > currentStats.highestWpm;
     setIsPersonalBest(newHighest);
 
     // Update stats
-    setUserStats(prev => {
+    setStats(prev => {
       const existingIdx = prev.history.findIndex(h => h.id === result.id);
       let newHistory = [...prev.history];
       if (existingIdx >= 0) {
@@ -288,17 +345,16 @@ export default function App() {
         unlockedBadges: prev.unlockedBadges
       };
 
-      try {
-        localStorage.setItem('nepali_typing_user_stats', JSON.stringify(updated));
-      } catch (e) {}
-
       return updated;
     });
   };
 
   // Live Session Update Handler (Realtime tracking for Analytics)
   const handleLiveSessionUpdate = useCallback((session: TestResult) => {
-    setUserStats(prev => {
+    const isEnglish = session.language === 'english';
+    const setStats = isEnglish ? setEnglishUserStats : setNepaliUserStats;
+
+    setStats(prev => {
       const existingIdx = prev.history.findIndex(h => h.id === session.id);
       let newHistory = [...prev.history];
       if (existingIdx >= 0) {
@@ -311,10 +367,6 @@ export default function App() {
         ...prev,
         history: newHistory
       };
-
-      try {
-        localStorage.setItem('nepali_typing_user_stats', JSON.stringify(updated));
-      } catch (e) {}
 
       return updated;
     });
@@ -353,12 +405,13 @@ export default function App() {
       ...INITIAL_USER_STATS,
       lastPracticeDate: new Date().toISOString().split('T')[0]
     };
-    setUserStats(resetStats);
-    try {
-      localStorage.setItem('nepali_typing_user_stats', JSON.stringify(resetStats));
-    } catch (e) {}
+    if (analyticsLanguage === 'english') {
+      setEnglishUserStats(resetStats);
+    } else {
+      setNepaliUserStats(resetStats);
+    }
     setKeyStatsMap({});
-  }, []);
+  }, [analyticsLanguage]);
 
   const handleNextHintKeyChange = useCallback((key: string | undefined) => {
     setNextHintKey(prev => (prev === key ? prev : key));
@@ -373,7 +426,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         settings={settings}
         updateSettings={updateSettings}
-        userStats={userStats}
+        userStats={activeUserStats}
         onOpenSettings={() => setShowSettingsModal(true)}
         isFullscreen={isFullscreen}
         toggleFullscreen={toggleFullscreen}
@@ -445,7 +498,7 @@ export default function App() {
 
         {activeTab === 'english' && (
           <EnglishTypingSection
-            userStats={userStats}
+            userStats={englishUserStats}
             liveKeyStatsMap={keyStatsMap}
             onTestComplete={handleTestComplete}
             onNavigateToNepali={() => setActiveTab('test')}
@@ -462,6 +515,7 @@ export default function App() {
           <PracticeMode
             settings={settings}
             onLaunchPracticeSession={handleLaunchTargetedPractice}
+            onBack={() => setActiveTab('test')}
           />
         )}
 
@@ -473,38 +527,46 @@ export default function App() {
               setActiveTab('test');
               setActiveResult(null);
             }}
+            onBack={() => setActiveTab('test')}
           />
         )}
 
         {activeTab === 'improvement' && (
           <TypingImprovementView
-            userStats={userStats}
+            userStats={nepaliUserStats}
             keyStatsMap={keyStatsMap}
             settings={settings}
             onLaunchFullPractice={(items, title) => {
               handleLaunchTargetedPractice(items);
               if (title) setActivePassageTitle(title);
             }}
-            onNavigateToAnalytics={() => setActiveTab('analytics')}
+            onNavigateToAnalytics={() => {
+              setAnalyticsLanguage('nepali');
+              setActiveTab('analytics');
+            }}
+            onBack={() => setActiveTab('test')}
           />
         )}
 
         {(activeTab === 'analytics' || (activeTab as string) === 'history' || (activeTab as string) === 'heatmap') && (
           <HistoryAnalytics
-            userStats={userStats}
+            userStats={analyticsLanguage === 'english' ? englishUserStats : nepaliUserStats}
             keyStatsMap={keyStatsMap}
             onStartTargetedPractice={handleLaunchTargetedPractice}
             onClearHistory={handleClearHistory}
             onNavigateToImprovement={() => setActiveTab('improvement')}
+            languageMode={analyticsLanguage}
+            onLanguageModeChange={setAnalyticsLanguage}
+            onBack={() => setActiveTab('test')}
           />
         )}
 
         {activeTab === 'certification' && (
-          <CertificationView />
+          <CertificationView onBack={() => setActiveTab('test')} />
         )}
 
         {activeTab === 'about' && (
-          <AboutView onNavigateTab={setActiveTab} />
+          <AboutView onNavigateTab={setActiveTab} onBack={() => setActiveTab('test')} />
         )}
 
       </main>

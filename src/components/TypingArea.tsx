@@ -1385,6 +1385,58 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           </div>
         )}
 
+        {/* Live Typed Text Preview (Custom Text Mode Only) */}
+        {settings.testType === 'custom' && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-inner">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                Live Typed Text
+              </span>
+              {settings.backspaceEnabled === false && (
+                <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
+                  Strict No-Backspace
+                </span>
+              )}
+            </div>
+            <div
+              className="font-nepali text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 flex flex-wrap gap-x-2 gap-y-1 max-h-24 overflow-y-auto"
+              style={getFontFamilyStyle()}
+            >
+              {/* Words typed so far */}
+              {targetWords.slice(0, currentWordIndex).map((targetWord, idx) => {
+                const actualTyped = typedHistory[idx] ?? '';
+                const isMatch = actualTyped === targetWord;
+                return (
+                  <span
+                    key={idx}
+                    className={
+                      isMatch
+                        ? 'text-blue-600 dark:text-blue-400 font-medium'
+                        : 'text-rose-600 dark:text-rose-400 font-semibold underline decoration-rose-500 decoration-2 bg-rose-50 dark:bg-rose-950/60 px-1 rounded'
+                    }
+                  >
+                    {actualTyped || '—'}
+                  </span>
+                );
+              })}
+
+              {/* Current word actively being typed */}
+              {typedInput && (
+                <span className="text-slate-900 dark:text-slate-100 font-bold bg-blue-50 dark:bg-blue-950/60 px-1 rounded border border-blue-200 dark:border-blue-800">
+                  {typedInput}
+                </span>
+              )}
+
+              {currentWordIndex === 0 && !typedInput && (
+                <span className="text-xs text-slate-400 italic">
+                  Start typing to see live keystroke output here...
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Text View Container */}
         <div
           ref={textContainerRef}

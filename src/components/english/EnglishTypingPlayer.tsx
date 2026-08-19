@@ -26,7 +26,8 @@ import {
   Volume2,
   VolumeX,
   Keyboard as KeyboardIcon,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react';
 import { sanitizeTargetText, isCharacterEquivalent } from '../../utils/textNormalizer';
 
@@ -102,6 +103,56 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
   // Auto-scroll refs
   const textContainerRef = useRef<HTMLDivElement>(null);
   const activeCharRef = useRef<HTMLSpanElement>(null);
+
+  // Leave confirmation modal state
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
+
+  // Auto-scroll engine
+  useEffect(() => {
+    if (!textContainerRef.current || !activeCharRef.current) return;
+    const container = textContainerRef.current;
+    const charEl = activeCharRef.current;
+
+    const charTop = charEl.offsetTop;
+    const containerHeight = container.clientHeight;
+    const targetLineOffset = containerHeight * 0.32;
+
+    let targetScrollTop = 0;
+    if (charTop > targetLineOffset) {
+      targetScrollTop = charTop - targetLineOffset;
+    }
+
+    const maxScroll = Math.max(0, container.scrollHeight - containerHeight);
+    const finalScrollTop = Math.min(targetScrollTop, maxScroll);
+
+    if (Math.abs(container.scrollTop - finalScrollTop) > 2) {
+      container.scrollTo({
+        top: finalScrollTop,
+        behavior: 'smooth'
+      });
+    }
+  }, [currentIndex]);
+
+  // Window resize handler to maintain active char position
+  useEffect(() => {
+    const handleResize = () => {
+      if (!textContainerRef.current || !activeCharRef.current) return;
+      const container = textContainerRef.current;
+      const charEl = activeCharRef.current;
+      const charTop = charEl.offsetTop;
+      const containerHeight = container.clientHeight;
+      const targetLineOffset = containerHeight * 0.32;
+      let targetScrollTop = 0;
+      if (charTop > targetLineOffset) {
+        targetScrollTop = charTop - targetLineOffset;
+      }
+      const maxScroll = Math.max(0, container.scrollHeight - containerHeight);
+      container.scrollTop = Math.min(targetScrollTop, maxScroll);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Detailed error trackers
   const mistypedWordsMapRef = useRef<Record<string, number>>({});
@@ -399,6 +450,15 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     mistypedWordsMapRef.current = {};
     mistypedCharsMapRef.current = {};
     keyStatsMapRef.current = {};
+    textContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  const handleAttemptExit = () => {
+    if (hasStarted && !isFinished) {
+      setShowExitConfirm(true);
+    } else {
+      onExit();
+    }
   };
 
   return (
@@ -408,18 +468,18 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-800/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-3">
           <button
-            onClick={onExit}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer"
+            onClick={handleAttemptExit}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-black transition-all cursor-pointer shadow-xs"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span>Back to Academy</span>
           </button>
           <div>
             <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <span>{lesson?.title || paragraphTest?.title || practiceModule?.title || improvementDrill?.title || 'English Typing Practice'}</span>
+              <span>{lesson?.title || paragraphTest?.title || practiceModule?.title || improvementDrill?.title || (customText ? 'Custom English Text' : 'English Typing Practice')}</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {lesson?.subtitle || paragraphTest?.category || practiceModule?.description || improvementDrill?.stageName || 'Touch Typing Precision'}
+              {lesson?.subtitle || paragraphTest?.category || practiceModule?.description || improvementDrill?.stageName || (customText ? 'User Provided Custom Practice' : 'Touch Typing Precision')}
             </p>
           </div>
         </div>
@@ -428,7 +488,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all"
+            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
             title={soundEnabled ? 'Disable Typing Sound' : 'Enable Typing Sound'}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-blue-500" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
@@ -497,6 +557,42 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         </div>
       </div>
 
+      {/* Live Typed Text Preview (Custom Text Mode Only) */}
+      {(modeType === 'custom' || customText) && (
+        <div className="p-3.5 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-inner">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+              Live Typed Text
+            </span>
+            {backspaceEnabled === false && (
+              <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
+                Strict No-Backspace
+              </span>
+            )}
+          </div>
+          <div className="font-mono text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 flex flex-wrap gap-x-0.5 max-h-24 overflow-y-auto">
+            {typedChars.map((tc, idx) => (
+              <span
+                key={idx}
+                className={
+                  tc.isCorrect
+                    ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'text-rose-600 dark:text-rose-400 font-bold underline decoration-rose-500 bg-rose-100 dark:bg-rose-950/60 px-0.5 rounded'
+                }
+              >
+                {tc.char === ' ' ? ' ' : tc.char}
+              </span>
+            ))}
+            {typedChars.length === 0 && (
+              <span className="text-xs text-slate-400 italic font-sans">
+                Start typing to see live keystroke output here...
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Interactive Text Display Canvas */}
       <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 relative select-none">
         
@@ -508,8 +604,11 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
           />
         </div>
 
-        {/* Typing Characters Stream */}
-        <div className="text-xl sm:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] max-h-[260px] overflow-y-auto p-4 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none">
+        {/* Typing Characters Stream with Auto-Scroll Tracking */}
+        <div
+          ref={textContainerRef}
+          className="relative text-xl sm:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] max-h-[260px] overflow-y-auto p-4 pb-28 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 focus:outline-none scroll-smooth"
+        >
           {targetChars.map((char, index) => {
             const isTyped = index < currentIndex;
             const isCurrent = index === currentIndex;
@@ -523,7 +622,11 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
             }
 
             return (
-              <span key={index} className={`transition-colors ${charClass}`}>
+              <span
+                key={index}
+                ref={isCurrent ? activeCharRef : null}
+                className={`transition-colors inline-block ${charClass}`}
+              >
                 {char === ' ' && isCurrent ? '␣' : char}
               </span>
             );
@@ -546,6 +649,49 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         onToggleGuidance={() => setShowKeyboardGuide(!showKeyboardGuide)}
         activeKey={activeKey}
       />
+
+      {/* Exit Confirmation Dialog */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                  Leave Test?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Your current typing session will be discarded.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+              Are you sure you want to return to English Academy? Any progress in this exercise will not be saved.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Continue Typing
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  onExit();
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-all cursor-pointer"
+              >
+                Leave Test
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Completion Modal / Results Card */}
       {isFinished && (

@@ -37,6 +37,7 @@ import {
 import { transliterateWordRuleBased } from '../utils/nepaliTransliteration';
 import { validateStrictKeystroke, getNextExpectedKey } from '../utils/strictTypingEngine';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
+import { ArrowLeft } from 'lucide-react';
 
 interface TypingImprovementViewProps {
   userStats: UserStats;
@@ -44,6 +45,7 @@ interface TypingImprovementViewProps {
   settings: TestSettings;
   onLaunchFullPractice: (items: string[], title?: string) => void;
   onNavigateToAnalytics?: () => void;
+  onBack?: () => void;
 }
 
 export const TypingImprovementView: React.FC<TypingImprovementViewProps> = ({
@@ -51,7 +53,8 @@ export const TypingImprovementView: React.FC<TypingImprovementViewProps> = ({
   keyStatsMap = {},
   settings,
   onLaunchFullPractice,
-  onNavigateToAnalytics
+  onNavigateToAnalytics,
+  onBack
 }) => {
   // Vocabulary mode toggle (Legal / Lok Sewa priority vs Standard)
   const [forceLegalVocabulary, setForceLegalVocabulary] = useState<boolean>(false);
@@ -304,9 +307,20 @@ export const TypingImprovementView: React.FC<TypingImprovementViewProps> = ({
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5 text-blue-300 animate-spin" />
-              <span>Adaptive Typing Improvement Engine</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-extrabold text-xs transition-all cursor-pointer border border-white/20"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>← Back to Typing Engine</span>
+                </button>
+              )}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
+                <Sparkles className="w-3.5 h-3.5 text-blue-300 animate-spin" />
+                <span>Adaptive Typing Improvement Engine</span>
+              </div>
             </div>
             
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white leading-tight">

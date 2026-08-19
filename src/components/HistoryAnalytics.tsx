@@ -30,6 +30,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { UserStats, KeyStats, TestResult, SessionStatus, DetailedWordError, DetailedCharError } from '../types';
 import { OnScreenKeyboard } from './OnScreenKeyboard';
 import { ErrorAnalysisView } from './ErrorAnalysisView';
+import { ArrowLeft, Calendar } from 'lucide-react';
 
 interface HistoryAnalyticsProps {
   userStats: UserStats;
@@ -37,6 +38,9 @@ interface HistoryAnalyticsProps {
   onClearHistory: () => void;
   onStartTargetedPractice?: (items: string[]) => void;
   onNavigateToImprovement?: () => void;
+  languageMode?: 'nepali' | 'english';
+  onLanguageModeChange?: (mode: 'nepali' | 'english') => void;
+  onBack?: () => void;
 }
 
 export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
@@ -44,7 +48,10 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
   keyStatsMap = {},
   onClearHistory,
   onStartTargetedPractice = (_items?: string[]) => {},
-  onNavigateToImprovement
+  onNavigateToImprovement,
+  languageMode = 'nepali',
+  onLanguageModeChange,
+  onBack
 }) => {
   // Primary Analytics Section Switcher ('current' vs 'lifetime')
   const [primarySection, setPrimarySection] = useState<'current' | 'lifetime'>('current');
@@ -140,6 +147,34 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
     const remMins = mins % 60;
     return `${hours}h ${remMins}m`;
   };
+
+  // ==========================================
+  // TODAY'S & WEEKLY STATISTICS ENGINE
+  // ==========================================
+  const todayStats = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    const todayTests = history.filter(h => new Date(h.timestamp).toDateString() === todayStr);
+    const count = todayTests.length;
+    const bestWpm = count > 0 ? Math.max(...todayTests.map(h => h.netWpm)) : 0;
+    const avgWpm = count > 0 ? Math.round(todayTests.reduce((a, b) => a + b.netWpm, 0) / count) : 0;
+    const avgAcc = count > 0 ? Math.round(todayTests.reduce((a, b) => a + b.accuracy, 0) / count) : 0;
+    const totalMistakes = todayTests.reduce((a, b) => a + (b.mistakesCount || 0), 0);
+    const totalTime = todayTests.reduce((a, b) => a + (b.elapsedSeconds || 0), 0);
+    return { count, bestWpm, avgWpm, avgAcc, totalMistakes, totalTime };
+  }, [history]);
+
+  const weeklyStats = useMemo(() => {
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const weeklyTests = history.filter(h => now - h.timestamp <= sevenDaysMs);
+    const count = weeklyTests.length;
+    const bestWpm = count > 0 ? Math.max(...weeklyTests.map(h => h.netWpm)) : 0;
+    const avgWpm = count > 0 ? Math.round(weeklyTests.reduce((a, b) => a + b.netWpm, 0) / count) : 0;
+    const avgAcc = count > 0 ? Math.round(weeklyTests.reduce((a, b) => a + b.accuracy, 0) / count) : 0;
+    const totalMistakes = weeklyTests.reduce((a, b) => a + (b.mistakesCount || 0), 0);
+    const totalTime = weeklyTests.reduce((a, b) => a + (b.elapsedSeconds || 0), 0);
+    return { count, bestWpm, avgWpm, avgAcc, totalMistakes, totalTime };
+  }, [history]);
 
   // ==========================================
   // LIFETIME MISTYPED WORDS & CHARS
@@ -350,15 +385,54 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-blue-400/20 text-blue-300 font-extrabold text-xs rounded-full border border-blue-400/30 w-max mb-3">
-              <Activity className="w-4 h-4 text-blue-300" />
-              <span>Real-Time Performance Engine</span>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 text-white font-black text-xs rounded-full border border-white/20 transition-all cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>← Back to Typing Engine</span>
+                </button>
+              )}
+              {onLanguageModeChange && (
+                <div className="flex items-center bg-blue-950/70 p-0.5 rounded-full border border-blue-400/30">
+                  <button
+                    onClick={() => onLanguageModeChange('nepali')}
+                    className={`px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
+                      languageMode === 'nepali'
+                        ? 'bg-blue-500 text-white shadow-xs'
+                        : 'text-blue-200 hover:text-white'
+                    }`}
+                  >
+                    🇳🇵 Nepali Analytics
+                  </button>
+                  <button
+                    onClick={() => onLanguageModeChange('english')}
+                    className={`px-3 py-1 rounded-full text-xs font-black transition-all cursor-pointer ${
+                      languageMode === 'english'
+                        ? 'bg-blue-500 text-white shadow-xs'
+                        : 'text-blue-200 hover:text-white'
+                    }`}
+                  >
+                    🇬🇧 English Analytics
+                  </button>
+                </div>
+              )}
+              {!onLanguageModeChange && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-blue-400/20 text-blue-300 font-extrabold text-xs rounded-full border border-blue-400/30 w-max">
+                  <Activity className="w-4 h-4 text-blue-300" />
+                  <span>{languageMode === 'english' ? 'English Typing Engine' : 'Nepali Devanagari Engine'}</span>
+                </div>
+              )}
             </div>
-            <h2 className="text-2xl sm:text-4xl font-black tracking-tight">
-              Typing Analytics & Performance Report
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tight flex items-center gap-3">
+              <span>{languageMode === 'english' ? '🇬🇧 English Typing Analytics' : '🇳🇵 Nepali Typing Analytics'}</span>
             </h2>
             <p className="text-blue-200 text-xs sm:text-sm mt-2 max-w-2xl font-medium leading-relaxed">
-              Analyze typing performance, inspect word and character mistake distributions, and track long-term progress over time.
+              {languageMode === 'english'
+                ? 'Permanent historical analytics, today/weekly progress tracking, QWERTY heatmap, and detailed English mistake diagnosis.'
+                : 'Permanent Devanagari typing analytics, speed trajectory, error heatmaps, and Lok Sewa exam accuracy diagnostics.'}
             </p>
           </div>
 
@@ -807,8 +881,120 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
           {(lifetimeSubTab === 'overview' || lifetimeSubTab === 'trends') && (
             <div className="space-y-8">
               
-              {/* Lifetime Hero Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {/* TODAY'S STATISTICS SECTION */}
+              <div className="bg-slate-50/80 dark:bg-slate-800/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-500" />
+                    <span>Today's Statistics</span>
+                  </h4>
+                  <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2.5 py-1 rounded-xl border border-blue-200 dark:border-blue-800">
+                    {todayStats.count} {todayStats.count === 1 ? 'Test Today' : 'Tests Today'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Today's Best WPM</span>
+                    <div className="text-xl font-black text-blue-600 dark:text-blue-400 mt-0.5">
+                      {todayStats.bestWpm} <span className="text-[10px] font-bold text-slate-400">WPM</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Today's Avg WPM</span>
+                    <div className="text-xl font-black text-slate-800 dark:text-slate-100 mt-0.5">
+                      {todayStats.avgWpm} <span className="text-[10px] font-bold text-slate-400">WPM</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Today's Accuracy</span>
+                    <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      {todayStats.avgAcc}%
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Today's Mistakes</span>
+                    <div className="text-xl font-black text-rose-600 dark:text-rose-400 mt-0.5">
+                      {todayStats.totalMistakes}
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Today's Time</span>
+                    <div className="text-xl font-black text-slate-700 dark:text-slate-200 mt-0.5">
+                      {formatTimeSpent(todayStats.totalTime)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* WEEKLY STATISTICS SECTION */}
+              <div className="bg-slate-50/80 dark:bg-slate-800/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-indigo-500" />
+                    <span>Weekly Statistics (Last 7 Days)</span>
+                  </h4>
+                  <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2.5 py-1 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                    {weeklyStats.count} {weeklyStats.count === 1 ? 'Test This Week' : 'Tests This Week'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Weekly Best WPM</span>
+                    <div className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
+                      {weeklyStats.bestWpm} <span className="text-[10px] font-bold text-slate-400">WPM</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Weekly Avg WPM</span>
+                    <div className="text-xl font-black text-slate-800 dark:text-slate-100 mt-0.5">
+                      {weeklyStats.avgWpm} <span className="text-[10px] font-bold text-slate-400">WPM</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Weekly Accuracy</span>
+                    <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      {weeklyStats.avgAcc}%
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Weekly Mistakes</span>
+                    <div className="text-xl font-black text-rose-600 dark:text-rose-400 mt-0.5">
+                      {weeklyStats.totalMistakes}
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Weekly Practice</span>
+                    <div className="text-xl font-black text-slate-700 dark:text-slate-200 mt-0.5">
+                      {formatTimeSpent(weeklyStats.totalTime)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* LIFETIME STATISTICS (PERMANENT) SECTION */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                    <span>Lifetime Statistics (Permanent Career Record)</span>
+                  </h4>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    All-time recorded history
+                  </span>
+                </div>
+
+                {/* Lifetime Hero Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 
                 <div className="bg-white dark:bg-slate-800/90 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                   <span className="text-xs font-extrabold uppercase text-slate-400 flex items-center gap-1.5">
@@ -859,6 +1045,7 @@ export const HistoryAnalytics: React.FC<HistoryAnalyticsProps> = ({
                 </div>
 
               </div>
+            </div>
 
               {/* Session Status Ratio Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

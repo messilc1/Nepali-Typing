@@ -27,11 +27,14 @@ import {
   HeartHandshake
 } from 'lucide-react';
 
+import { ArrowLeft } from 'lucide-react';
+
 interface AboutViewProps {
   onNavigateTab?: (tab: any) => void;
+  onBack?: () => void;
 }
 
-export const AboutView: React.FC<AboutViewProps> = () => {
+export const AboutView: React.FC<AboutViewProps> = ({ onNavigateTab, onBack }) => {
   const stats = [
     { value: '5+', label: 'Years of Academic Excellence', icon: GraduationCap, color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' },
     { value: 'Top 10', label: 'Nepal Bar Council License Exam Rank', icon: Award, color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
@@ -91,9 +94,20 @@ export const AboutView: React.FC<AboutViewProps> = () => {
         <div className="relative z-10 flex flex-col lg:flex-row items-center lg:items-start justify-between gap-8">
           
           <div className="space-y-4 text-center lg:text-left flex-1">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 font-extrabold text-xs tracking-wider uppercase">
-              <Scale className="w-4 h-4 text-amber-400" />
-              <span>Creator Profile & Legal Background</span>
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-extrabold text-xs transition-all cursor-pointer border border-white/20"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>← Back to Typing Engine</span>
+                </button>
+              )}
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 font-extrabold text-xs tracking-wider uppercase">
+                <Scale className="w-4 h-4 text-amber-400" />
+                <span>Creator Profile & Legal Background</span>
+              </div>
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
