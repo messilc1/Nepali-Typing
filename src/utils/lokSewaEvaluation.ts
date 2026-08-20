@@ -48,10 +48,10 @@ export interface LokSewaEvaluationResult {
 
 /**
  * Calculates Lok Sewa IT Skill Test evaluation.
- * Formula: CWPM = (Total Words Typed − Wrong Words) ÷ 5
+ * Official PSC Nepal Formula: Correct WPM (CWPM) = (Total Words Typed − Wrong Words) ÷ 5 = Correct Words ÷ 5
  *
  * @param language 'nepali' | 'english'
- * @param totalWords Total words completed in the test
+ * @param totalWords Total words completed in the test (up to 200 max or 5 minutes)
  * @param wrongWords Number of words with errors
  * @param elapsedSeconds Elapsed time in seconds (normally 300s for a 5-min exam)
  */
@@ -63,12 +63,8 @@ export function calculateLokSewaEvaluation(
 ): LokSewaEvaluationResult {
   const correctWords = Math.max(0, totalWords - wrongWords);
 
-  // In the standard 5-minute exam, divisor is 5.
-  // For live progress during active tests, use actual minutes or scaled to 5 min.
-  const minutes = elapsedSeconds > 0 ? elapsedSeconds / 60 : 5;
-  const timeDivisor = elapsedSeconds >= 290 ? 5 : Math.max(0.2, minutes);
-
-  const rawCwpm = (totalWords - wrongWords) / timeDivisor;
+  // Official PSC Nepal formula: Correct WPM = Correct Words ÷ 5
+  const rawCwpm = correctWords / 5;
   const cwpm = Math.max(0, Number(rawCwpm.toFixed(2)));
 
   const isNepali = language === 'nepali';
@@ -114,17 +110,17 @@ export function calculateLokSewaEvaluation(
 }
 
 export const LOK_SEWA_TOOLTIP_TEXT =
-  'Lok Sewa Typing Mode: 5-minute typing test. Score is based on Correct Words Per Minute (CWPM), calculated by deducting wrong words from total words typed. Devanagari requires 25+ CWPM for 2.5 marks; English requires 30+ CWPM for 2.5 marks.';
+  'Lok Sewa Exam Mode: 5-minute maximum test (auto-stops at 200 words typed). Score is based on Correct WPM = (Total Words - Wrong Words) ÷ 5. Devanagari requires 25+ CWPM for 2.5 full marks; English requires 30+ CWPM for 2.5 full marks.';
 
 /**
- * Ensures any typing passage for Lok Sewa Mode contains at least 300 words.
- * If the selected or generated passage contains fewer than 300 words, it automatically
- * repeats complete sentences/paragraphs with proper spacing and punctuation until it reaches at least 300 words.
+ * Ensures any typing passage for Lok Sewa Mode contains at least 200 words.
+ * If the selected or generated passage contains fewer than 200 words, it automatically
+ * repeats complete sentences/paragraphs with proper spacing and punctuation until it reaches at least 200 words.
  *
  * @param text The original passage text
- * @param minWords Minimum required word count (default 300)
+ * @param minWords Minimum required word count (default 200)
  */
-export function ensureLokSewaMinimumWords(text: string, minWords: number = 300): string {
+export function ensureLokSewaMinimumWords(text: string, minWords: number = 200): string {
   if (!text || !text.trim()) {
     return text;
   }

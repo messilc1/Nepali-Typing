@@ -88,7 +88,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     else if (improvementDrill) raw = improvementDrill.content;
     const sanitized = sanitizeTargetText(raw);
     if (lokSewaActive) {
-      return ensureLokSewaMinimumWords(sanitized, 300);
+      return ensureLokSewaMinimumWords(sanitized, 200);
     }
     return sanitized;
   }, [customText, lesson, paragraphTest, practiceModule, improvementDrill, lokSewaActive]);
@@ -175,9 +175,17 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
   // Auto-scroll refs
   const textContainerRef = useRef<HTMLDivElement>(null);
   const activeCharRef = useRef<HTMLSpanElement>(null);
+  const livePreviewRef = useRef<HTMLDivElement>(null);
 
   // Leave confirmation modal state
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
+
+  // Auto-scroll Live Typed Text container vertically to always keep latest keystrokes visible
+  useEffect(() => {
+    if (livePreviewRef.current) {
+      livePreviewRef.current.scrollTop = livePreviewRef.current.scrollHeight;
+    }
+  }, [typedChars]);
 
   // Auto-scroll engine
   useEffect(() => {
@@ -482,10 +490,20 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         keyStatsMapRef.current[lowerKey] = existingKeyStat;
 
         playClickSound(false);
-        setTypedChars(prev => [...prev, { char: expectedChar, isCorrect: true }]);
+        const nextTyped = [...typedChars, { char: expectedChar, isCorrect: true }];
+        setTypedChars(nextTyped);
 
         const nextIdx = currentIndex + 1;
         setCurrentIndex(nextIdx);
+
+        // Check Lok Sewa 200-word auto-stop condition
+        if (lokSewaActive) {
+          const currentWordsTyped = nextTyped.map(c => c.char).join('').split(/\s+/).filter(Boolean).length;
+          if (currentWordsTyped >= 200) {
+            finishSession();
+            return;
+          }
+        }
 
         // Check if finished
         if (nextIdx >= targetChars.length) {
@@ -522,9 +540,18 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
 
         // In 'allow' mode, advance cursor with mistake recorded
         if (mistakeMode === 'allow') {
-          setTypedChars(prev => [...prev, { char: inputChar, isCorrect: false }]);
+          const nextTyped = [...typedChars, { char: inputChar, isCorrect: false }];
+          setTypedChars(nextTyped);
           const nextIdx = currentIndex + 1;
           setCurrentIndex(nextIdx);
+
+          if (lokSewaActive) {
+            const currentWordsTyped = nextTyped.map(c => c.char).join('').split(/\s+/).filter(Boolean).length;
+            if (currentWordsTyped >= 200) {
+              finishSession();
+              return;
+            }
+          }
 
           if (nextIdx >= targetChars.length) {
             finishSession();
@@ -532,7 +559,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         }
       }
     }
-  }, [isFinished, hasStarted, currentIndex, targetChars, playClickSound, finishSession, backspaceEnabled, mistakeCount, maxMistakes, maxMistakesAction, mistakeMode]);
+  }, [isFinished, hasStarted, currentIndex, targetChars, playClickSound, finishSession, backspaceEnabled, mistakeCount, maxMistakes, maxMistakesAction, mistakeMode, lokSewaActive, typedChars]);
 
   // Attach global keyboard listener
   useEffect(() => {
@@ -717,13 +744,13 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         </div>
       </div>
 
-      {/* Live Typed Text Preview (Custom Text Mode Only) */}
+      {/* Live Typed Text Preview */}
       {(modeType === 'custom' || customText) && (
-        <div className="p-3.5 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-inner">
+        <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-              Live Typed Text
+              Live Typed Text (Actual Output)
             </span>
             {backspaceEnabled === false && (
               <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
@@ -731,7 +758,10 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
               </span>
             )}
           </div>
-          <div className="font-mono text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap max-h-24 overflow-y-auto">
+          <div
+            ref={livePreviewRef}
+            className="font-mono text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words max-h-28 overflow-y-auto overflow-x-hidden w-full select-text"
+          >
             {typedChars.map((tc, idx) => {
               if (tc.char === '\n') {
                 return (
@@ -762,7 +792,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         </div>
       )}
 
-      {/* Interactive Text Display Canvas with Natural Word Wrapping */}
+      {/* Interactive Text Display Canvas (Monkeytype Minimalist Stream) */}
       <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 relative select-none">
         
         {/* Progress Bar */}
@@ -785,23 +815,26 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
                   {token.chars.map((c) => {
                     const isTyped = c.index < currentIndex;
                     const isCurrent = c.index === currentIndex;
-                    let charClass = 'text-slate-400 dark:text-slate-500';
+                    let charClass = 'text-slate-400/80 dark:text-slate-500/90';
 
                     if (isTyped) {
-                      charClass = 'text-emerald-600 dark:text-emerald-400 font-semibold';
-                    } else if (isCurrent) {
-                      charClass =
-                        'bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse inline-block';
+                      charClass = 'text-slate-800 dark:text-slate-100 font-medium';
                     }
 
                     return (
-                      <span
-                        key={c.index}
-                        ref={isCurrent ? activeCharRef : null}
-                        className={`transition-colors ${charClass}`}
-                      >
-                        {c.char}
-                      </span>
+                      <React.Fragment key={c.index}>
+                        {isCurrent && (
+                          <span
+                            ref={activeCharRef}
+                            className="inline-block w-[2.5px] h-[1.15em] bg-blue-500 dark:bg-blue-400 rounded-full animate-pulse transition-all duration-75 align-middle mx-[0.5px] -mb-1 shadow-xs"
+                          />
+                        )}
+                        <span
+                          className={`transition-colors ${charClass}`}
+                        >
+                          {c.char}
+                        </span>
+                      </React.Fragment>
                     );
                   })}
                 </span>
@@ -812,29 +845,24 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
               const isTyped = token.startIndex < currentIndex;
               const isCurrent = token.startIndex === currentIndex;
 
-              if (isCurrent) {
-                return (
-                  <span
-                    key={token.startIndex}
-                    ref={activeCharRef}
-                    className="inline-block bg-blue-600 text-white font-extrabold px-1 rounded shadow-sm ring-2 ring-blue-400 animate-pulse mx-0.5"
-                  >
-                    ␣
-                  </span>
-                );
-              }
-
               return (
-                <span
-                  key={token.startIndex}
-                  className={`inline-block whitespace-pre ${
-                    isTyped
-                      ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                      : 'text-slate-400 dark:text-slate-500'
-                  }`}
-                >
-                  {' '}
-                </span>
+                <React.Fragment key={token.startIndex}>
+                  {isCurrent && (
+                    <span
+                      ref={activeCharRef}
+                      className="inline-block w-[2.5px] h-[1.15em] bg-blue-500 dark:bg-blue-400 rounded-full animate-pulse transition-all duration-75 align-middle mx-[0.5px] -mb-1 shadow-xs"
+                    />
+                  )}
+                  <span
+                    className={`inline-block whitespace-pre ${
+                      isTyped
+                        ? 'text-slate-800 dark:text-slate-100 font-medium'
+                        : 'text-slate-400/80 dark:text-slate-500/90'
+                    }`}
+                  >
+                    {' '}
+                  </span>
+                </React.Fragment>
               );
             }
 

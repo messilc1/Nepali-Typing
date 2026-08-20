@@ -104,15 +104,23 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const textContainerRef = useRef<HTMLDivElement>(null);
+  const liveTypedContainerRef = useRef<HTMLDivElement>(null);
 
   const effectiveTargetText = useMemo(() => {
     if (settings.lokSewaMode) {
-      return ensureLokSewaMinimumWords(targetText, 300);
+      return ensureLokSewaMinimumWords(targetText, 200);
     }
     return targetText;
   }, [targetText, settings.lokSewaMode]);
 
   const targetWords = useMemo(() => extractSanitizedWords(effectiveTargetText), [effectiveTargetText]);
+
+  // Auto-scroll Live Typed Text container vertically to always keep latest keystrokes in view
+  useEffect(() => {
+    if (liveTypedContainerRef.current) {
+      liveTypedContainerRef.current.scrollTop = liveTypedContainerRef.current.scrollHeight;
+    }
+  }, [typedHistory, typedInput, romanBuffer]);
 
   // Compute live statistics helper
   const computeLiveStats = useCallback((overrideElapsedSec?: number): LiveStats => {
@@ -883,12 +891,14 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       onLiveStatsChange?.(computeLiveStats());
       emitLiveSession('Abandoned');
 
-      // Check test completion for words mode or end of passage
+      // Check test completion: Lok Sewa mode auto-stops at 200 words typed, or word count limit, or end of passage
       if (
+        (settings.lokSewaMode && nextHistory.length >= 200) ||
         (settings.testType === 'words' && nextWordIdx >= settings.wordCount) ||
         nextWordIdx >= targetWords.length
       ) {
         finishTest();
+        return;
       }
       return;
     }
@@ -1430,13 +1440,13 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           </div>
         )}
 
-        {/* Live Typed Text Preview (Nepali Custom Text Mode Only) */}
+        {/* Live Typed Text Preview */}
         {settings.testType === 'custom' && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 shadow-inner">
+          <div className="mb-4 p-3.5 rounded-xl bg-slate-50/90 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 shadow-xs">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                Live Typed Text (Actual Devanagari Output)
+                Live Typed Text (Actual Output)
               </span>
               {settings.backspaceEnabled === false && (
                 <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
@@ -1445,30 +1455,33 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
               )}
             </div>
             <div
-              className="font-nepali text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 flex flex-wrap items-center gap-x-2 gap-y-1.5 max-h-24 overflow-y-auto"
+              ref={liveTypedContainerRef}
+              className="font-nepali text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words max-h-28 overflow-y-auto overflow-x-hidden w-full select-text"
               style={getFontFamilyStyle()}
             >
-              {/* Words typed so far */}
+              {/* Words typed so far with preserved spaces */}
               {targetWords.slice(0, currentWordIndex).map((targetWord, idx) => {
                 const actualTyped = typedHistory[idx] ?? '';
                 const isMatch = actualTyped === targetWord;
                 return (
-                  <span
-                    key={idx}
-                    className={
-                      isMatch
-                        ? 'text-blue-600 dark:text-blue-400 font-medium'
-                        : 'text-rose-600 dark:text-rose-400 font-semibold underline decoration-rose-500 decoration-2 bg-rose-50 dark:bg-rose-950/60 px-1 rounded'
-                    }
-                  >
-                    {actualTyped || '—'}
-                  </span>
+                  <React.Fragment key={idx}>
+                    <span
+                      className={
+                        isMatch
+                          ? 'text-blue-600 dark:text-blue-400 font-medium'
+                          : 'text-rose-600 dark:text-rose-400 font-semibold underline decoration-rose-500 decoration-2 bg-rose-50 dark:bg-rose-950/60 px-0.5 rounded'
+                      }
+                    >
+                      {actualTyped || '—'}
+                    </span>
+                    <span> </span>
+                  </React.Fragment>
                 );
               })}
 
               {/* Current word actively being typed with character-level accuracy */}
               {typedInput && (
-                <span className="inline-flex items-center gap-0.5 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                <span className="inline-flex items-center gap-0.5 bg-blue-50 dark:bg-blue-950/60 px-1 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                   {typedInput.split('').map((char, charIdx) => {
                     const expectedChar = currentTargetWord[charIdx];
                     const isCharMatch = expectedChar === char;
@@ -1502,7 +1515,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
           </div>
         )}
 
-        {/* Text View Container */}
+        {/* Text View Container (Monkeytype Minimalist In-Place Canvas) */}
         <div
           ref={textContainerRef}
           onMouseDown={(e) => {
@@ -1510,7 +1523,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
             e.preventDefault();
             inputRef.current?.focus();
           }}
-          className={`relative w-full flex flex-wrap gap-x-3.5 gap-y-2.5 text-slate-400 dark:text-slate-500 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 pt-2 pb-28 select-none focus:outline-none ${getFontSizeClass()}`}
+          className={`relative w-full flex flex-wrap gap-x-3 gap-y-2.5 text-slate-400/80 dark:text-slate-500/90 font-normal transition-all max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-2 pt-2 pb-28 select-none focus:outline-none scroll-smooth break-words ${getFontSizeClass()}`}
           style={getFontFamilyStyle()}
         >
           {targetWords.map((word, wordIdx) => {
@@ -1522,29 +1535,30 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
               <span
                 key={wordIdx}
                 ref={isCurrent ? activeWordRef : null}
-                className={`relative px-0.5 py-0.5 transition-all ${
+                className={`relative px-0.5 py-0.5 transition-all inline-block whitespace-nowrap ${
                   isTyped
                     ? typedWord === word
-                      ? 'text-blue-600 dark:text-blue-400 font-medium'
+                      ? 'text-slate-800 dark:text-slate-100 font-medium'
                       : ''
-                    : 'text-slate-400 dark:text-slate-500'
+                    : 'text-slate-400/80 dark:text-slate-500/90'
                 }`}
               >
                 {word.split('').map((char, charIdx) => {
                   let charClass = '';
+                  const isCharCaret = isCurrent && charIdx === typedInput.length;
+
                   if (isCurrent) {
                     if (charIdx < typedInput.length) {
                       if (typedInput[charIdx] === char) {
-                        charClass = 'text-blue-600 dark:text-blue-400 font-medium';
+                        charClass = 'text-blue-600 dark:text-blue-400 font-semibold';
                       } else {
-                        charClass = 'text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950 rounded px-0.5';
+                        charClass = 'text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 rounded px-0.5';
                       }
                     }
-                    // No highlight for active alphabet (charIdx === typedInput.length) or upcoming alphabets
                   } else if (isTyped && typedWord !== word) {
                     if (charIdx < typedWord.length) {
                       if (typedWord[charIdx] === char) {
-                        charClass = 'text-blue-600 dark:text-blue-400 font-medium';
+                        charClass = 'text-slate-800 dark:text-slate-100 font-medium';
                       } else {
                         charClass = 'text-rose-600 dark:text-rose-400 underline decoration-rose-500 decoration-2';
                       }
@@ -1554,11 +1568,21 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
                   }
 
                   return (
-                    <span key={charIdx} className={charClass}>
-                      {char}
-                    </span>
+                    <React.Fragment key={charIdx}>
+                      {isCharCaret && (
+                        <span className="inline-block w-[2.5px] h-[1.15em] bg-blue-500 dark:bg-blue-400 rounded-full animate-pulse transition-all duration-75 align-middle mx-[0.5px] -mb-1 shadow-xs" />
+                      )}
+                      <span className={charClass}>
+                        {char}
+                      </span>
+                    </React.Fragment>
                   );
                 })}
+
+                {/* Smooth caret at the end of current word if all characters typed */}
+                {isCurrent && typedInput.length >= word.length && (
+                  <span className="inline-block w-[2.5px] h-[1.15em] bg-blue-500 dark:bg-blue-400 rounded-full animate-pulse transition-all duration-75 align-middle mx-[0.5px] -mb-1 shadow-xs" />
+                )}
 
                 {/* Extra characters typed beyond length */}
                 {isCurrent && typedInput.length > word.length && (

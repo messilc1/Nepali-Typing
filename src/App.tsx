@@ -258,10 +258,10 @@ export default function App() {
         else sourceWords = ENGLISH_WORDS_MEDIUM;
       }
 
-      // If Lok Sewa mode, generate at least 350 words so user has continuous 300+ words
-      const defaultCount = settings.lokSewaMode ? 350 : 100;
+      // If Lok Sewa mode, generate at least 250 words so user has continuous 200+ words
+      const defaultCount = settings.lokSewaMode ? 250 : 100;
       const count = settings.testType === 'words'
-        ? (settings.lokSewaMode ? Math.max(300, settings.wordCount) : settings.wordCount)
+        ? (settings.lokSewaMode ? Math.max(200, settings.wordCount) : settings.wordCount)
         : defaultCount;
       const sampled: string[] = [];
       for (let i = 0; i < count; i++) {
@@ -272,7 +272,7 @@ export default function App() {
     }
 
     if (settings.lokSewaMode) {
-      return ensureLokSewaMinimumWords(text, 300);
+      return ensureLokSewaMinimumWords(text, 200);
     }
     return text;
   };
