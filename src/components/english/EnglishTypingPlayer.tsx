@@ -30,7 +30,8 @@ import {
   Keyboard as KeyboardIcon,
   ShieldCheck,
   Sparkles,
-  BookOpen
+  BookOpen,
+  FileText
 } from 'lucide-react';
 import { sanitizeTargetText, isCharacterEquivalent } from '../../utils/textNormalizer';
 
@@ -683,41 +684,43 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         </div>
       )}
 
-      {/* Live Heads-Up Dashboard (WPM, Accuracy, Time, Mistakes) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
-            <Zap className="w-5 h-5" />
+      {/* Live Heads-Up Dashboard (WPM, Accuracy, Time, Words Typed, Mistakes) */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0">
+            <Zap className="w-4 h-4" />
           </div>
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
               {lokSewaActive ? 'Correct WPM' : 'Speed'}
             </span>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
-              {lokSewaActive ? liveStats.lokSewaEval.cwpm : liveStats.netWpm} <span className="text-xs font-bold text-slate-500">WPM</span>
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
+              {lokSewaActive ? liveStats.lokSewaEval.cwpm : liveStats.netWpm} <span className="text-[10px] font-bold text-slate-500">WPM</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
-            <Target className="w-5 h-5" />
+        <div className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
+            <Target className="w-4 h-4" />
           </div>
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Accuracy</span>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
-              {liveStats.accuracy}<span className="text-xs font-bold text-slate-500">%</span>
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
+              {liveStats.accuracy}<span className="text-[10px] font-bold text-slate-500">%</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0">
-            <Clock className="w-5 h-5" />
+        <div className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0">
+            <Clock className="w-4 h-4" />
           </div>
           <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Time</span>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              {effectiveTimeLimit ? 'Time Left' : 'Time'}
+            </span>
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
               {effectiveTimeLimit
                 ? `${Math.floor(Math.max(0, effectiveTimeLimit - elapsedSeconds) / 60)}:${String(Math.max(0, effectiveTimeLimit - elapsedSeconds) % 60).padStart(2, '0')}`
                 : `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`}
@@ -725,16 +728,28 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
-            <AlertTriangle className="w-5 h-5" />
+        <div className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
+            <FileText className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Words Typed</span>
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
+              {liveStats.totalWordsTyped} <span className="text-[10px] font-bold text-slate-500">w</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800/90 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+            <AlertTriangle className="w-4 h-4" />
           </div>
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
               {lokSewaActive ? 'Wrong Words' : 'Mistakes'}
             </span>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
-              {lokSewaActive ? liveStats.wrongWords : mistakeCount} <span className="text-[10px] font-bold text-slate-400">({backspaceCount} ⌫)</span>
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 font-mono">
+              {lokSewaActive ? liveStats.wrongWords : mistakeCount} <span className="text-[9px] font-bold text-slate-400">({backspaceCount}⌫)</span>
             </div>
           </div>
         </div>
@@ -1022,32 +1037,52 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
             )}
 
             {/* Core Stats Grid */}
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Net Speed</span>
                 <div className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono">
                   {liveStats.netWpm} <span className="text-xs font-bold text-slate-500">WPM</span>
                 </div>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Accuracy</span>
                 <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
                   {liveStats.accuracy}%
                 </div>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Words Typed</span>
+                <div className="text-2xl font-black text-purple-600 dark:text-purple-400 font-mono">
+                  {liveStats.totalWordsTyped} <span className="text-xs font-bold text-slate-500">words</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  {liveStats.correctWords} correct • {liveStats.wrongWords} wrong
+                </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Duration</span>
+                <div className="text-lg font-black text-slate-800 dark:text-slate-200 font-mono">
+                  {Math.floor(elapsedSeconds / 60)}m {elapsedSeconds % 60}s
+                </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Gross WPM</span>
                 <div className="text-lg font-black text-slate-800 dark:text-slate-200 font-mono">
                   {liveStats.grossWpm} WPM
                 </div>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Mistakes</span>
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Mistakes & Edits</span>
                 <div className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono">
                   {mistakeCount} <span className="text-xs font-semibold text-slate-400">({backspaceCount} ⌫)</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                  {liveStats.correctCharacters} correct chars
                 </div>
               </div>
             </div>

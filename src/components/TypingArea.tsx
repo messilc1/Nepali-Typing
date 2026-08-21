@@ -194,7 +194,10 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     const accuracy = totalCharsTyped > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalCharsTyped) * 100))) : 100;
 
     let remainingSec: number | null = null;
-    if (settings.testType === 'time' && settings.durationSeconds > 0) {
+    if (
+      ((settings.testType === 'time') || (settings.testType === 'custom' && !settings.noTimeLimit)) &&
+      settings.durationSeconds > 0
+    ) {
       remainingSec = Math.max(0, settings.durationSeconds - elapsedSec);
     }
 
@@ -426,7 +429,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       netWpm: 0,
       accuracy: 100,
       elapsedSeconds: 0,
-      remainingSeconds: settings.testType === 'time' ? settings.durationSeconds : null,
+      remainingSeconds: ((settings.testType === 'time') || (settings.testType === 'custom' && !settings.noTimeLimit)) && settings.durationSeconds > 0 ? settings.durationSeconds : null,
       totalWords: targetWords.length,
       completedWordsCount: 0,
       mistakesCount: 0,

@@ -698,7 +698,10 @@ export default function App() {
           initialLanguage={settings.language}
           currentSettings={settings}
           onStartCustomTest={(text, customSettings) => {
-            setActivePassageTitle('Custom Practice Paragraph');
+            const timeTitle = customSettings.durationSeconds && !customSettings.noTimeLimit
+              ? `Custom Time Test (${customSettings.durationSeconds < 60 ? `${customSettings.durationSeconds}s` : `${Math.floor(customSettings.durationSeconds / 60)}m${customSettings.durationSeconds % 60 ? ` ${customSettings.durationSeconds % 60}s` : ''}`})`
+              : 'Custom Practice Paragraph';
+            setActivePassageTitle(timeTitle);
             updateSettings({
               ...customSettings,
               testType: 'custom',

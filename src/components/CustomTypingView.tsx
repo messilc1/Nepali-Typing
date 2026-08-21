@@ -18,7 +18,9 @@ import {
   Save,
   Check,
   X,
-  Star
+  Star,
+  Timer,
+  Zap
 } from 'lucide-react';
 import { LanguageMode } from '../types';
 import { SAMPLE_PARAGRAPHS } from '../data/wordPacks';
@@ -63,6 +65,19 @@ const PRESETS_STORAGE_KEY = 'nepali_typing_custom_presets';
 
 const DEFAULT_PRESETS: CustomTypingPreset[] = [
   {
+    id: 'preset-timed-1min',
+    name: '⏱️ 1-Minute Custom Speed Test',
+    language: 'nepali',
+    text: SAMPLE_PARAGRAPHS.constitution,
+    wordCountLimit: null,
+    timeLimitSeconds: 60,
+    lokSewaMode: false,
+    mistakeMode: 'strict',
+    backspaceEnabled: true,
+    showHints: true,
+    isDefault: true
+  },
+  {
     id: 'preset-loksewa-5min',
     name: '🇳🇵 Lok Sewa 5-Min Model Exam',
     language: 'nepali',
@@ -88,12 +103,12 @@ const DEFAULT_PRESETS: CustomTypingPreset[] = [
     showHints: false
   },
   {
-    id: 'preset-eng-speed-3min',
-    name: '🇬🇧 English 3-Minute Speed Test',
+    id: 'preset-eng-speed-1min',
+    name: '🇬🇧 English 1-Minute Speed Test',
     language: 'english',
     text: ENGLISH_PARAGRAPH_TESTS[0]?.text || 'The civil service examination tests speed, accuracy, and endurance.',
     wordCountLimit: null,
-    timeLimitSeconds: 180,
+    timeLimitSeconds: 60,
     lokSewaMode: false,
     mistakeMode: 'strict',
     backspaceEnabled: true,
@@ -105,14 +120,37 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
   initialLanguage = 'nepali',
   initialText = '',
   initialWordCount = null,
-  initialTimeSeconds = 300,
+  initialTimeSeconds = 60,
   onStartTest,
   isModalMode = false
 }) => {
   const [language, setLanguage] = useState<LanguageMode>(initialLanguage);
   const [text, setText] = useState<string>(initialText);
 
-  // Word count limit state
+  // Mode selection: 'test' (Custom Time Test) | 'practice' (Word Target & Passage)
+  const [activeMode, setActiveMode] = useState<'test' | 'practice'>(() => {
+    return initialWordCount !== null && initialWordCount > 0 ? 'practice' : 'test';
+  });
+
+  // Time limit state (Used by Test mode and optional in Practice mode)
+  const [selectedTimeLimitSec, setSelectedTimeLimitSec] = useState<number>(initialTimeSeconds ?? 60);
+  const [isCustomTimeSelected, setIsCustomTimeSelected] = useState<boolean>(() => {
+    const s = initialTimeSeconds ?? 60;
+    return ![15, 30, 60, 120, 180, 300].includes(s);
+  });
+  const [customMinInput, setCustomMinInput] = useState<string>(() => {
+    const s = initialTimeSeconds ?? 60;
+    return Math.floor(s / 60).toString();
+  });
+  const [customSecInput, setCustomSecInput] = useState<string>(() => {
+    const s = initialTimeSeconds ?? 60;
+    return (s % 60).toString();
+  });
+
+  // Practice mode time limit toggle (unlimited vs limit)
+  const [practiceTimeLimitMode, setPracticeTimeLimitMode] = useState<'unlimited' | 'limit'>('unlimited');
+
+  // Word count limit state (For practice mode)
   const [wordLimitMode, setWordLimitMode] = useState<'unlimited' | 'limit'>(() => {
     return initialWordCount !== null && initialWordCount > 0 ? 'limit' : 'unlimited';
   });
@@ -120,14 +158,6 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
   const [customWordLimitInput, setCustomWordLimitInput] = useState<string>(
     initialWordCount ? initialWordCount.toString() : '200'
   );
-
-  // Time limit state
-  const [timeLimitMode, setTimeLimitMode] = useState<'unlimited' | 'limit'>(() => {
-    return initialTimeSeconds !== null && initialTimeSeconds > 0 ? 'limit' : 'limit';
-  });
-  const [selectedTimeLimitSec, setSelectedTimeLimitSec] = useState<number>(initialTimeSeconds ?? 300);
-  const [customMinInput, setCustomMinInput] = useState<string>('5');
-  const [customSecInput, setCustomSecInput] = useState<string>('0');
 
   // Additional options
   const [lokSewaMode, setLokSewaMode] = useState<boolean>(false);
@@ -160,6 +190,17 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
     } catch {}
   }, [presets]);
 
+  // Set default sample text on initial load if empty
+  useEffect(() => {
+    if (!text) {
+      if (language === 'nepali') {
+        setText(SAMPLE_PARAGRAPHS.constitution);
+      } else {
+        setText(ENGLISH_PARAGRAPH_TESTS[0]?.text || '');
+      }
+    }
+  }, [language]);
+
   // Analyze text stats
   const stats = useMemo(() => {
     const trimmed = text.trim();
@@ -172,22 +213,55 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
     return { chars, words, lines };
   }, [text]);
 
+  // Compute effective time limit based on mode
+  const effectiveTimeLimitSeconds = useMemo((): number | null => {
+    if (lokSewaMode) return 300; // 5 minutes standard for Lok Sewa
+
+    if (activeMode === 'test') {
+      if (isCustomTimeSelected) {
+        const min = parseInt(customMinInput, 10) || 0;
+        const sec = parseInt(customSecInput, 10) || 0;
+        const total = min * 60 + sec;
+        return total > 0 ? total : 60;
+      }
+      return selectedTimeLimitSec > 0 ? selectedTimeLimitSec : 60;
+    }
+
+    // Practice mode
+    if (practiceTimeLimitMode === 'unlimited') return null;
+    if (isCustomTimeSelected) {
+      const min = parseInt(customMinInput, 10) || 0;
+      const sec = parseInt(customSecInput, 10) || 0;
+      const total = min * 60 + sec;
+      return total > 0 ? total : 300;
+    }
+    return selectedTimeLimitSec > 0 ? selectedTimeLimitSec : 300;
+  }, [
+    lokSewaMode,
+    activeMode,
+    isCustomTimeSelected,
+    customMinInput,
+    customSecInput,
+    selectedTimeLimitSec,
+    practiceTimeLimitMode
+  ]);
+
   // Compute effective word count limit
   const effectiveWordLimit = useMemo((): number | null => {
+    if (activeMode === 'test') return null; // Test mode runs until time expires
     if (wordLimitMode === 'unlimited') return null;
     const customNum = parseInt(customWordLimitInput, 10);
     return !isNaN(customNum) && customNum > 0 ? customNum : selectedWordLimit;
-  }, [wordLimitMode, customWordLimitInput, selectedWordLimit]);
+  }, [activeMode, wordLimitMode, customWordLimitInput, selectedWordLimit]);
 
-  // Compute effective time limit
-  const effectiveTimeLimitSeconds = useMemo((): number | null => {
-    if (lokSewaMode) return 300; // 5 minutes standard for Lok Sewa
-    if (timeLimitMode === 'unlimited') return null;
-    const min = parseInt(customMinInput, 10) || 0;
-    const sec = parseInt(customSecInput, 10) || 0;
-    const total = min * 60 + sec;
-    return total > 0 ? total : selectedTimeLimitSec;
-  }, [lokSewaMode, timeLimitMode, customMinInput, customSecInput, selectedTimeLimitSec]);
+  // Format time label for UI
+  const formatDurationLabel = (sec: number | null) => {
+    if (sec === null || sec <= 0) return 'Untimed';
+    if (sec < 60) return `${sec}s`;
+    const mins = Math.floor(sec / 60);
+    const remSec = sec % 60;
+    return remSec > 0 ? `${mins}m ${remSec}s` : `${mins} min`;
+  };
 
   // Quick Sample Insertion
   const handleLoadSample = (sampleText: string) => {
@@ -207,6 +281,14 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
     }
   };
 
+  // Select standard preset duration
+  const handleSelectStandardDuration = (sec: number) => {
+    setSelectedTimeLimitSec(sec);
+    setIsCustomTimeSelected(false);
+    setCustomMinInput(Math.floor(sec / 60).toString());
+    setCustomSecInput((sec % 60).toString());
+  };
+
   // Preset operations
   const handleLoadPreset = (presetId: string) => {
     const preset = presets.find(p => p.id === presetId);
@@ -214,23 +296,26 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
     setActivePresetId(preset.id);
     setLanguage(preset.language);
     setText(preset.text);
-    if (preset.wordCountLimit) {
-      setWordLimitMode('limit');
-      setSelectedWordLimit(preset.wordCountLimit);
-      setCustomWordLimitInput(preset.wordCountLimit.toString());
-    } else {
-      setWordLimitMode('unlimited');
-    }
 
-    if (preset.timeLimitSeconds) {
-      setTimeLimitMode('limit');
-      setSelectedTimeLimitSec(preset.timeLimitSeconds);
-      const min = Math.floor(preset.timeLimitSeconds / 60);
-      const sec = preset.timeLimitSeconds % 60;
-      setCustomMinInput(min.toString());
-      setCustomSecInput(sec.toString());
+    if (preset.timeLimitSeconds && !preset.wordCountLimit) {
+      setActiveMode('test');
+      handleSelectStandardDuration(preset.timeLimitSeconds);
     } else {
-      setTimeLimitMode('unlimited');
+      setActiveMode('practice');
+      if (preset.wordCountLimit) {
+        setWordLimitMode('limit');
+        setSelectedWordLimit(preset.wordCountLimit);
+        setCustomWordLimitInput(preset.wordCountLimit.toString());
+      } else {
+        setWordLimitMode('unlimited');
+      }
+
+      if (preset.timeLimitSeconds) {
+        setPracticeTimeLimitMode('limit');
+        handleSelectStandardDuration(preset.timeLimitSeconds);
+      } else {
+        setPracticeTimeLimitMode('unlimited');
+      }
     }
 
     setLokSewaMode(preset.lokSewaMode);
@@ -270,11 +355,10 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
   const handleResetToDefault = () => {
     setLanguage('nepali');
     setText(SAMPLE_PARAGRAPHS.constitution);
+    setActiveMode('test');
+    handleSelectStandardDuration(60);
     setWordLimitMode('unlimited');
-    setTimeLimitMode('limit');
-    setSelectedTimeLimitSec(300);
-    setCustomMinInput('5');
-    setCustomSecInput('0');
+    setPracticeTimeLimitMode('unlimited');
     setLokSewaMode(false);
     setMistakeMode('strict');
     setBackspaceEnabled(true);
@@ -286,8 +370,17 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
     if (!text.trim()) return;
 
     let targetText = text.trim();
-    // Repetition check: if effectiveWordLimit is greater than text words, expand text automatically
-    if (effectiveWordLimit && effectiveWordLimit > stats.words && stats.words > 0) {
+    const effectiveTimeSec = effectiveTimeLimitSeconds;
+
+    // Repetition check:
+    // 1. If in Test mode with a time limit, auto-expand short text so the user never runs out of words during their timed test
+    if (activeMode === 'test' && effectiveTimeSec && effectiveTimeSec > 0) {
+      const estimatedWordsNeeded = Math.max(stats.words, Math.ceil((effectiveTimeSec / 60) * 80));
+      if (stats.words > 0 && stats.words < estimatedWordsNeeded) {
+        targetText = expandTextToWordCount(targetText, estimatedWordsNeeded);
+      }
+    } else if (effectiveWordLimit && effectiveWordLimit > stats.words && stats.words > 0) {
+      // 2. In Practice mode, expand text if fixed word target exceeds text words
       targetText = expandTextToWordCount(targetText, effectiveWordLimit);
     }
 
@@ -313,8 +406,8 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
       {/* Studio Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800/80">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
               <FileText className="w-5 h-5" />
             </span>
             <div>
@@ -322,7 +415,7 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
                 <span>Custom Typing Studio</span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Paste or write your custom text, configure word count & timers, and save reusable presets.
+                Test your typing speed with custom time limits or practice custom paragraphs at your own pace.
               </p>
             </div>
           </div>
@@ -366,8 +459,37 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
         </div>
       </div>
 
+      {/* Mode Switcher: Test Mode vs Practice Mode */}
+      <div className="p-1.5 bg-slate-100/80 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          onClick={() => setActiveMode('test')}
+          className={`py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeMode === 'test'
+              ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <Timer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <span>⏱️ Test Mode (Custom Time Limit)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMode('practice')}
+          className={`py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeMode === 'practice'
+              ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/80 dark:border-slate-700/80'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <Type className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <span>📝 Practice Mode (Word Target / Untimed)</span>
+        </button>
+      </div>
+
       {/* Preset Selector & Management Bar */}
-      <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
             <Bookmark className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -432,7 +554,7 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
               type="text"
               value={newPresetName}
               onChange={(e) => setNewPresetName(e.target.value)}
-              placeholder="e.g. My 5-Minute Lok Sewa Model Set"
+              placeholder="e.g. My 1-Minute Custom Speed Test"
               className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
@@ -460,7 +582,7 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <Type className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Practice Text & Paragraph</span>
+            <span>Custom Text & Paragraph</span>
           </label>
 
           <div className="flex items-center gap-2">
@@ -496,7 +618,7 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
                 : 'Paste or type your custom English text, code comments, technical article, or literature excerpt here...'
             }
             rows={isModalMode ? 6 : 8}
-            className={`w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-950/60 text-slate-900 dark:text-slate-100 text-sm sm:text-base leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all font-sans resize-y ${
+            className={`w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-950/60 text-slate-900 dark:text-slate-100 text-sm sm:text-base leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all resize-y ${
               language === 'nepali' ? 'nepali-font-apply' : 'font-sans'
             }`}
           />
@@ -569,191 +691,260 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
         </div>
       </div>
 
-      {/* Test Conditions Controls: Word Count + Time */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-        {/* 1. WORD COUNT CONFIGURATION */}
-        <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Type className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Word Limit Target</span>
-            </span>
-
-            <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 dark:bg-slate-700/70 rounded-lg text-[11px] font-semibold">
-              <button
-                type="button"
-                onClick={() => setWordLimitMode('unlimited')}
-                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                  wordLimitMode === 'unlimited'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                Unlimited
-              </button>
-              <button
-                type="button"
-                onClick={() => setWordLimitMode('limit')}
-                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                  wordLimitMode === 'limit'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                Fixed Limit
-              </button>
+      {/* ========================================================================= */}
+      {/* MODE SPECIFIC CONTROLS */}
+      {/* ========================================================================= */}
+      {activeMode === 'test' ? (
+        /* 1. TEST MODE: CUSTOM TIME LIMIT CONFIGURATION */
+        <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border-2 border-blue-200/80 dark:border-blue-900/60 space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-black uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>Test Duration — Set Custom Time</span>
+              </span>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                “How many words can I type within the selected time?” Countdown timer begins upon your first keystroke.
+              </p>
             </div>
+
+            <span className="self-start sm:self-auto px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200 font-bold text-xs">
+              ⏱️ {formatDurationLabel(effectiveTimeLimitSeconds)} Test
+            </span>
           </div>
 
-          {wordLimitMode === 'limit' ? (
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[50, 100, 150, 200, 300, 500].map((count) => (
-                  <button
-                    key={count}
-                    type="button"
-                    onClick={() => {
-                      setSelectedWordLimit(count);
-                      setCustomWordLimitInput(count.toString());
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      selectedWordLimit === count && customWordLimitInput === count.toString()
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {count}w
-                  </button>
-                ))}
-              </div>
+          {/* Preset Duration Pills */}
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { label: '15 seconds', sec: 15 },
+                { label: '30 seconds', sec: 30 },
+                { label: '1 minute', sec: 60 },
+                { label: '2 minutes', sec: 120 },
+                { label: '3 minutes', sec: 180 },
+                { label: '5 minutes', sec: 300 }
+              ].map((item) => (
+                <button
+                  key={item.sec}
+                  type="button"
+                  onClick={() => handleSelectStandardDuration(item.sec)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    !isCustomTimeSelected && selectedTimeLimitSec === item.sec
+                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400/50'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <span>{item.label}</span>
+                </button>
+              ))}
 
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs text-slate-500 font-medium">Custom Words:</span>
-                <input
-                  type="number"
-                  min="5"
-                  max="5000"
-                  value={customWordLimitInput}
-                  onChange={(e) => {
-                    setCustomWordLimitInput(e.target.value);
-                    const val = parseInt(e.target.value, 10);
-                    if (!isNaN(val)) setSelectedWordLimit(val);
-                  }}
-                  className="w-24 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomTimeSelected(true)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isCustomTimeSelected
+                    ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400/50'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                <span>⚙️ Custom Time</span>
+              </button>
+            </div>
 
-              {effectiveWordLimit && effectiveWordLimit > stats.words && stats.words > 0 && (
-                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900 text-[11px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    Auto-repetition enabled: Text will loop seamlessly to provide {effectiveWordLimit} words.
-                  </span>
+            {/* Custom Time Input Controls */}
+            {isCustomTimeSelected && (
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800/80 flex flex-wrap items-center gap-3 animate-fadeIn text-xs">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Set Duration:</span>
+                
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={customMinInput}
+                    onChange={(e) => setCustomMinInput(e.target.value)}
+                    className="w-16 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-black text-center text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                  <span className="font-semibold text-slate-600 dark:text-slate-400">minutes</span>
                 </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-500 dark:text-slate-400 py-1">
-              Type the full provided text until completion (or until the timer expires).
-            </p>
-          )}
+
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={customSecInput}
+                    onChange={(e) => setCustomSecInput(e.target.value)}
+                    className="w-16 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-black text-center text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                  <span className="font-semibold text-slate-600 dark:text-slate-400">seconds</span>
+                </div>
+
+                <span className="text-[11px] text-slate-400">
+                  (Total: {(parseInt(customMinInput, 10) || 0) * 60 + (parseInt(customSecInput, 10) || 0)}s)
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+      ) : (
+        /* 2. PRACTICE MODE: WORD TARGET + TIME CONTROLS */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
+          {/* WORD COUNT CONFIGURATION */}
+          <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                <Type className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Word Limit Target</span>
+              </span>
 
-        {/* 2. TIME LIMIT CONFIGURATION */}
-        <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Time Limit</span>
-            </span>
-
-            <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 dark:bg-slate-700/70 rounded-lg text-[11px] font-semibold">
-              <button
-                type="button"
-                onClick={() => setTimeLimitMode('unlimited')}
-                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                  timeLimitMode === 'unlimited'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                No Timer
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimeLimitMode('limit')}
-                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                  timeLimitMode === 'limit'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
-                    : 'text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                Fixed Timer
-              </button>
+              <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 dark:bg-slate-700/70 rounded-lg text-[11px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setWordLimitMode('unlimited')}
+                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    wordLimitMode === 'unlimited'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Full Passage
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWordLimitMode('limit')}
+                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    wordLimitMode === 'limit'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Fixed Target
+                </button>
+              </div>
             </div>
+
+            {wordLimitMode === 'limit' ? (
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[50, 100, 150, 200, 300, 500].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => {
+                        setSelectedWordLimit(count);
+                        setCustomWordLimitInput(count.toString());
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        selectedWordLimit === count && customWordLimitInput === count.toString()
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {count}w
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-slate-500 font-medium">Custom Words:</span>
+                  <input
+                    type="number"
+                    min="5"
+                    max="5000"
+                    value={customWordLimitInput}
+                    onChange={(e) => {
+                      setCustomWordLimitInput(e.target.value);
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) setSelectedWordLimit(val);
+                    }}
+                    className="w-24 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                {effectiveWordLimit && effectiveWordLimit > stats.words && stats.words > 0 && (
+                  <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900 text-[11px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      Auto-repetition: Passage will repeat to provide {effectiveWordLimit} words.
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400 py-1">
+                Practice the complete text until you reach the end.
+              </p>
+            )}
           </div>
 
-          {timeLimitMode === 'limit' ? (
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { label: '30s', sec: 30 },
-                  { label: '1m', sec: 60 },
-                  { label: '2m', sec: 120 },
-                  { label: '3m', sec: 180 },
-                  { label: '5m', sec: 300 },
-                  { label: '10m', sec: 600 }
-                ].map((item) => (
-                  <button
-                    key={item.sec}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTimeLimitSec(item.sec);
-                      const min = Math.floor(item.sec / 60);
-                      const sec = item.sec % 60;
-                      setCustomMinInput(min.toString());
-                      setCustomSecInput(sec.toString());
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      selectedTimeLimitSec === item.sec && effectiveTimeLimitSeconds === item.sec
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+          {/* PRACTICE TIME LIMIT CONFIGURATION */}
+          <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Optional Timer</span>
+              </span>
 
-              <div className="flex items-center gap-2 pt-1 text-xs">
-                <span className="text-slate-500 font-medium">Custom:</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="60"
-                  value={customMinInput}
-                  onChange={(e) => setCustomMinInput(e.target.value)}
-                  className="w-14 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-center text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-                <span className="text-slate-500">m</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  value={customSecInput}
-                  onChange={(e) => setCustomSecInput(e.target.value)}
-                  className="w-14 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-center text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-                <span className="text-slate-500">s</span>
+              <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 dark:bg-slate-700/70 rounded-lg text-[11px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setPracticeTimeLimitMode('unlimited')}
+                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    practiceTimeLimitMode === 'unlimited'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  No Timer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPracticeTimeLimitMode('limit')}
+                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    practiceTimeLimitMode === 'limit'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Fixed Timer
+                </button>
               </div>
             </div>
-          ) : (
-            <p className="text-xs text-slate-500 dark:text-slate-400 py-1">
-              Test runs continuously at your own pace without any countdown timer.
-            </p>
-          )}
+
+            {practiceTimeLimitMode === 'limit' ? (
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { label: '30s', sec: 30 },
+                    { label: '1m', sec: 60 },
+                    { label: '2m', sec: 120 },
+                    { label: '3m', sec: 180 },
+                    { label: '5m', sec: 300 }
+                  ].map((item) => (
+                    <button
+                      key={item.sec}
+                      type="button"
+                      onClick={() => handleSelectStandardDuration(item.sec)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        !isCustomTimeSelected && selectedTimeLimitSec === item.sec
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400 py-1">
+                Practice continuously at your own relaxed pace.
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Expandable Advanced Options */}
       <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -861,17 +1052,24 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
       {/* Start Test Action Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
         <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-          <span>Target:</span>
-          <span className="font-bold text-slate-700 dark:text-slate-200">
-            {effectiveWordLimit ? `${effectiveWordLimit} Words` : `${stats.words} Words (Full Text)`}
+          <span>Mode:</span>
+          <span className="font-bold text-blue-600 dark:text-blue-400">
+            {activeMode === 'test' ? '⏱️ Time Test' : '📝 Practice'}
           </span>
           <span>•</span>
           <span>Duration:</span>
           <span className="font-bold text-slate-700 dark:text-slate-200">
-            {effectiveTimeLimitSeconds
-              ? `${Math.floor(effectiveTimeLimitSeconds / 60)}m ${effectiveTimeLimitSeconds % 60 ? `${effectiveTimeLimitSeconds % 60}s` : ''}`
-              : 'Untimed'}
+            {formatDurationLabel(effectiveTimeLimitSeconds)}
           </span>
+          {activeMode === 'practice' && (
+            <>
+              <span>•</span>
+              <span>Target:</span>
+              <span className="font-bold text-slate-700 dark:text-slate-200">
+                {effectiveWordLimit ? `${effectiveWordLimit} Words` : `${stats.words} Words (Full)`}
+              </span>
+            </>
+          )}
         </div>
 
         <button
@@ -882,7 +1080,11 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
           className="w-full sm:w-auto px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           <Play className="w-4 h-4 fill-white" />
-          <span>Start Custom Test</span>
+          <span>
+            {activeMode === 'test'
+              ? `Start Time Test (${formatDurationLabel(effectiveTimeLimitSeconds)})`
+              : 'Start Custom Practice'}
+          </span>
         </button>
       </div>
     </div>

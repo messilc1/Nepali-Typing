@@ -35,7 +35,10 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
 
   // Calculate progress percentage
   let progressPercent = 0;
-  if (settings.testType === 'time' && settings.durationSeconds > 0) {
+  if (
+    ((settings.testType === 'time') || (settings.testType === 'custom' && !settings.noTimeLimit)) &&
+    settings.durationSeconds > 0
+  ) {
     progressPercent = Math.min(100, (elapsedSeconds / settings.durationSeconds) * 100);
   } else if (settings.testType === 'words' && totalWords > 0) {
     progressPercent = Math.min(100, (completedWordsCount / totalWords) * 100);
@@ -47,7 +50,7 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
         
         {/* Net WPM */}
         {settings.showLiveWpm && (
-          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+          <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
             <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Net WPM
             </span>
@@ -57,19 +60,9 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
           </div>
         )}
 
-        {/* Gross WPM */}
-        <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-            Gross WPM
-          </span>
-          <div className="text-2xl sm:text-3xl font-semibold text-slate-800 dark:text-slate-200 tabular-nums leading-tight mt-0.5">
-            {grossWpm}
-          </div>
-        </div>
-
         {/* Accuracy */}
         {settings.showLiveAccuracy && (
-          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+          <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
             <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Accuracy
             </span>
@@ -87,7 +80,7 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
 
         {/* Time / Progress */}
         {settings.showTimer && (
-          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+          <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
             <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               {remainingSeconds !== null ? 'Time Remaining' : 'Elapsed Time'}
             </span>
@@ -97,9 +90,19 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
           </div>
         )}
 
+        {/* Words Typed */}
+        <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            Words Typed
+          </span>
+          <div className="text-2xl sm:text-3xl font-semibold text-slate-800 dark:text-slate-200 tabular-nums leading-tight mt-0.5">
+            {completedWordsCount}
+          </div>
+        </div>
+
         {/* Mistakes Count */}
         {settings.showMistakes && (
-          <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+          <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
             <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Mistakes
             </span>
@@ -110,7 +113,7 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
         )}
 
         {/* Backspaces */}
-        <div className="flex-1 min-w-[120px] px-4 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+        <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
           <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
             Backspaces
           </span>
@@ -122,7 +125,7 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
       </div>
 
       {/* Progress Bar Line */}
-      {(settings.testType === 'time' || settings.testType === 'words') && (
+      {((settings.testType === 'time' || (settings.testType === 'custom' && !settings.noTimeLimit)) || settings.testType === 'words') && (
         <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 overflow-hidden">
           <div
             className="bg-blue-600 dark:bg-blue-500 h-1 transition-all duration-300 ease-out"
