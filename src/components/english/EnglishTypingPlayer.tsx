@@ -496,13 +496,11 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         const nextIdx = currentIndex + 1;
         setCurrentIndex(nextIdx);
 
-        // Check Lok Sewa 200-word auto-stop condition
-        if (lokSewaActive) {
-          const currentWordsTyped = nextTyped.map(c => c.char).join('').split(/\s+/).filter(Boolean).length;
-          if (currentWordsTyped >= 200) {
-            finishSession();
-            return;
-          }
+        // Check Lok Sewa 200-word auto-stop condition OR custom word count target
+        const currentWordsTyped = nextTyped.map(c => c.char).join('').split(/\s+/).filter(Boolean).length;
+        if ((lokSewaActive && currentWordsTyped >= 200) || (wordLimit && wordLimit > 0 && currentWordsTyped >= wordLimit)) {
+          finishSession();
+          return;
         }
 
         // Check if finished
@@ -545,12 +543,10 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
           const nextIdx = currentIndex + 1;
           setCurrentIndex(nextIdx);
 
-          if (lokSewaActive) {
-            const currentWordsTyped = nextTyped.map(c => c.char).join('').split(/\s+/).filter(Boolean).length;
-            if (currentWordsTyped >= 200) {
-              finishSession();
-              return;
-            }
+          const currentWordsTypedAllow = nextTyped.map(c => c.char).join('').split(/\s+/).filter(Boolean).length;
+          if ((lokSewaActive && currentWordsTypedAllow >= 200) || (wordLimit && wordLimit > 0 && currentWordsTypedAllow >= wordLimit)) {
+            finishSession();
+            return;
           }
 
           if (nextIdx >= targetChars.length) {
@@ -559,7 +555,7 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
         }
       }
     }
-  }, [isFinished, hasStarted, currentIndex, targetChars, playClickSound, finishSession, backspaceEnabled, mistakeCount, maxMistakes, maxMistakesAction, mistakeMode, lokSewaActive, typedChars]);
+  }, [isFinished, hasStarted, currentIndex, targetChars, playClickSound, finishSession, backspaceEnabled, mistakeCount, maxMistakes, maxMistakesAction, mistakeMode, lokSewaActive, wordLimit, typedChars]);
 
   // Attach global keyboard listener
   useEffect(() => {

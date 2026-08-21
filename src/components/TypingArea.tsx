@@ -895,6 +895,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       if (
         (settings.lokSewaMode && nextHistory.length >= 200) ||
         (settings.testType === 'words' && nextWordIdx >= settings.wordCount) ||
+        (settings.testType === 'custom' && settings.wordCount && settings.wordCount > 0 && nextHistory.length >= settings.wordCount) ||
         nextWordIdx >= targetWords.length
       ) {
         finishTest();
