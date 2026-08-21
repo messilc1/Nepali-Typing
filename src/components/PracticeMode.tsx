@@ -16,15 +16,40 @@ import {
   Target,
   Clock,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  Trash2,
+  X,
+  PlusCircle,
+  Check
 } from 'lucide-react';
 import { NEPALI_PRACTICE_DATA, DIFFICULTY_LEVEL_TABS, NepaliPracticeCategory, NepaliPracticeSubCategory } from '../data/nepaliPracticeData';
 import { LEGAL_TERMS_PACK } from '../data/wordPacks';
 import { TestSettings, LegalTerm } from '../types';
-import { transliterateWordRuleBased } from '../utils/nepaliTransliteration';
+import { transliterateWordRuleBased, getRomanizedHintForWord } from '../utils/nepaliTransliteration';
 import { validateStrictKeystroke } from '../utils/strictTypingEngine';
+import { stripInvisibleCharacters, areDevanagariWordsEquivalent, isCharacterEquivalent } from '../utils/textNormalizer';
 import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { NepaliRomanizedKeyboardDiagram } from './NepaliRomanizedKeyboardDiagram';
+
+const STORAGE_KEY = 'nepali_practice_user_custom_items_v1';
+
+const getStoredCustomItems = (): Record<string, string[]> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const setStoredCustomItems = (data: Record<string, string[]>) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error('Failed to save custom items:', err);
+  }
+};
 
 interface PracticeModeProps {
   settings: TestSettings;
@@ -44,6 +69,11 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
   const [selectedSubCatId, setSelectedSubCatId] = useState<string>('vowels');
   const [difficultyFilter, setDifficultyFilter] = useState<string>('All');
   
+  // Custom items persisted across categories
+  const [customItemsMap, setCustomItemsMap] = useState<Record<string, string[]>>(() => getStoredCustomItems());
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [newItemsInput, setNewItemsInput] = useState<string>('');
+
   // Interactive Drill State
   const [typedInput, setTypedInput] = useState<string>('');
   const [romanBuffer, setRomanBuffer] = useState<string>('');
@@ -84,13 +114,15 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
     }
   }, [rejectedKeyInfo]);
 
-  // Load items when subcategory changes
+  // Load items when category, subcategory or customItemsMap changes
   useEffect(() => {
     const category = NEPALI_PRACTICE_DATA.find((c) => c.id === selectedCategoryId);
     if (!category) return;
     const subCat = category.subCategories.find((s) => s.id === selectedSubCatId) || category.subCategories[0];
     if (subCat) {
-      setActiveItems(subCat.items);
+      const userAdded = customItemsMap[subCat.id] || [];
+      const combinedItems = [...subCat.items, ...userAdded];
+      setActiveItems(combinedItems);
       setCurrentIndex(0);
       setTypedInput('');
       setRomanBuffer('');
@@ -100,13 +132,27 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       setStartTime(null);
       setElapsedSeconds(0);
       setIsDrillCompleted(false);
+      setIsAddModalOpen(false);
+      setNewItemsInput('');
     }
-  }, [selectedCategoryId, selectedSubCatId]);
+  }, [selectedCategoryId, selectedSubCatId, customItemsMap]);
 
   const activeCategory = NEPALI_PRACTICE_DATA.find((c) => c.id === selectedCategoryId) || NEPALI_PRACTICE_DATA[0];
   const activeSubCategory =
     activeCategory.subCategories.find((s) => s.id === selectedSubCatId) || activeCategory.subCategories[0];
   const currentItem = activeItems[currentIndex] || activeItems[0] || 'नेपाल';
+
+  const userCustomItemsForCurrentSubCat = useMemo(() => {
+    return customItemsMap[selectedSubCatId] || [];
+  }, [customItemsMap, selectedSubCatId]);
+
+  // Derived Romanized key hint for target item (works for both built-in and user-added items)
+  const currentRomanHint = useMemo(() => {
+    if (activeSubCategory.romanHints && activeSubCategory.romanHints[currentItem]) {
+      return activeSubCategory.romanHints[currentItem];
+    }
+    return getRomanizedHintForWord(currentItem);
+  }, [activeSubCategory, currentItem]);
 
   const handleShuffleItems = () => {
     const shuffled = [...activeItems].sort(() => Math.random() - 0.5);
@@ -131,6 +177,64 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
     setIsDrillCompleted(false);
   };
 
+  const handleAddItems = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newItemsInput.trim()) return;
+
+    // Split by commas, newlines, or spaces
+    const rawTokens = newItemsInput
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const parsedItems: string[] = [];
+    for (const token of rawTokens) {
+      if (activeCategory.id !== 'sentences-drill' && activeCategory.id !== 'paragraphs-drill' && token.includes(' ')) {
+        const subTokens = token.split(/\s+/).filter((t) => t.trim().length > 0);
+        parsedItems.push(...subTokens);
+      } else {
+        parsedItems.push(token);
+      }
+    }
+
+    if (parsedItems.length === 0) return;
+
+    const currentCustom = customItemsMap[selectedSubCatId] || [];
+    // Deduplicate while preserving order
+    const updatedCustom = Array.from(new Set([...currentCustom, ...parsedItems]));
+    const updatedMap = {
+      ...customItemsMap,
+      [selectedSubCatId]: updatedCustom
+    };
+
+    setCustomItemsMap(updatedMap);
+    setStoredCustomItems(updatedMap);
+
+    const combined = [...activeSubCategory.items, ...updatedCustom];
+    setActiveItems(combined);
+    setNewItemsInput('');
+    setIsAddModalOpen(false);
+  };
+
+  const handleRemoveCustomItem = (itemToRemove: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const currentCustom = customItemsMap[selectedSubCatId] || [];
+    const updatedCustom = currentCustom.filter((item) => item !== itemToRemove);
+    const updatedMap = {
+      ...customItemsMap,
+      [selectedSubCatId]: updatedCustom
+    };
+
+    setCustomItemsMap(updatedMap);
+    setStoredCustomItems(updatedMap);
+
+    const combined = [...activeSubCategory.items, ...updatedCustom];
+    setActiveItems(combined);
+    if (currentIndex >= combined.length) {
+      setCurrentIndex(Math.max(0, combined.length - 1));
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isDrillCompleted) return;
 
@@ -139,6 +243,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
     }
 
     const currentBuf = settings.language === 'nepali' ? romanBuffer : typedInput;
+    const cleanTarget = stripInvisibleCharacters(currentItem);
 
     if (e.key === 'Backspace') {
       if (settings.language === 'nepali') {
@@ -155,6 +260,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       return;
     }
 
+    // Space or Enter key -> optional progression if user manually presses it
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
       const validation = validateStrictKeystroke({
@@ -169,7 +275,10 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       if (!validation.isValid) {
         playErrorSound(settings.soundVolume);
         setMistakesCount((prev) => prev + 1);
-        setMistypedKeysMap((prev) => ({ ...prev, [validation.expectedKey || 'Space']: (prev[validation.expectedKey || 'Space'] || 0) + 1 }));
+        setMistypedKeysMap((prev) => ({
+          ...prev,
+          [validation.expectedKey || 'Space']: (prev[validation.expectedKey || 'Space'] || 0) + 1
+        }));
         setInputShake(true);
         setRejectedKeyInfo({
           key: 'Space',
@@ -182,7 +291,6 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       setCompletedCount((prev) => prev + 1);
       
       if (currentIndex + 1 >= activeItems.length) {
-        // Drill finished!
         setIsDrillCompleted(true);
       } else {
         setCurrentIndex((prev) => prev + 1);
@@ -193,7 +301,8 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       return;
     }
 
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+    // Normal single keystroke typing
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const validation = validateStrictKeystroke({
         targetWord: currentItem,
         currentBuffer: currentBuf,
@@ -206,7 +315,10 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       if (!validation.isValid) {
         playErrorSound(settings.soundVolume);
         setMistakesCount((prev) => prev + 1);
-        setMistypedKeysMap((prev) => ({ ...prev, [validation.expectedKey || e.key]: (prev[validation.expectedKey || e.key] || 0) + 1 }));
+        setMistypedKeysMap((prev) => ({
+          ...prev,
+          [validation.expectedKey || e.key]: (prev[validation.expectedKey || e.key] || 0) + 1
+        }));
         setInputShake(true);
         setRejectedKeyInfo({
           key: e.key,
@@ -215,15 +327,60 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
         return;
       }
 
+      // Valid keystroke
       playKeypressSound(settings.sound, settings.soundVolume);
       setRejectedKeyInfo(null);
 
       if (settings.language === 'nepali') {
         const nextBuf = romanBuffer + e.key;
-        setRomanBuffer(nextBuf);
-        setTypedInput(transliterateWordRuleBased(nextBuf));
+        const nextDevanagari = transliterateWordRuleBased(nextBuf);
+        const cleanConverted = stripInvisibleCharacters(nextDevanagari);
+        const targetRoman = getRomanizedHintForWord(cleanTarget);
+
+        // Check if item is completely typed -> Automatically advance immediately
+        const isItemComplete =
+          cleanConverted === cleanTarget ||
+          areDevanagariWordsEquivalent(cleanConverted, cleanTarget) ||
+          (cleanTarget.length > 0 &&
+            cleanConverted.replace(/्$/, '') === cleanTarget.replace(/्$/, '') &&
+            (cleanConverted.length >= cleanTarget.length || nextBuf.length >= targetRoman.length)) ||
+          (targetRoman && targetRoman.length > 0 && nextBuf.toLowerCase() === targetRoman.toLowerCase()) ||
+          (validation.isWordComplete && (cleanConverted === cleanTarget || areDevanagariWordsEquivalent(cleanConverted, cleanTarget)));
+
+        if (isItemComplete) {
+          setCompletedCount((prev) => prev + 1);
+          if (currentIndex + 1 >= activeItems.length) {
+            setIsDrillCompleted(true);
+          } else {
+            setCurrentIndex((prev) => prev + 1);
+            setTypedInput('');
+            setRomanBuffer('');
+            setRejectedKeyInfo(null);
+          }
+        } else {
+          setRomanBuffer(nextBuf);
+          setTypedInput(nextDevanagari);
+        }
       } else {
-        setTypedInput((prev) => prev + e.key);
+        // English Mode
+        const nextBuf = typedInput + e.key;
+        const isItemComplete =
+          nextBuf === cleanTarget ||
+          isCharacterEquivalent(nextBuf, cleanTarget);
+
+        if (isItemComplete) {
+          setCompletedCount((prev) => prev + 1);
+          if (currentIndex + 1 >= activeItems.length) {
+            setIsDrillCompleted(true);
+          } else {
+            setCurrentIndex((prev) => prev + 1);
+            setTypedInput('');
+            setRomanBuffer('');
+            setRejectedKeyInfo(null);
+          }
+        } else {
+          setTypedInput(nextBuf);
+        }
       }
     }
   };
@@ -291,6 +448,15 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <button
+              onClick={() => setIsAddModalOpen((prev) => !prev)}
+              title="Add words or characters to this category"
+              className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/80 text-blue-700 dark:text-blue-300 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 border border-blue-200 dark:border-blue-800"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Items</span>
+            </button>
+
+            <button
               onClick={handleShuffleItems}
               title="Shuffle drill items"
               className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
@@ -309,6 +475,62 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Inline Add Items Expansion Panel */}
+        {isAddModalOpen && (
+          <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 space-y-3 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PlusCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-blue-950 dark:text-blue-200">
+                  Add Items to {activeSubCategory.name}
+                </span>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Type or paste Nepali characters, matras, difficult conjuncts, or words below. Separate multiple items with commas, spaces, or new lines. They will be added directly into this exercise and saved.
+            </p>
+
+            <form onSubmit={handleAddItems} className="space-y-2.5">
+              <textarea
+                value={newItemsInput}
+                onChange={(e) => setNewItemsInput(e.target.value)}
+                placeholder="e.g. संविधान, न्यायपालिका, अदालत, न्यायाधीश or क्ष, त्र, ज्ञ, श्र"
+                rows={2}
+                className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 nepali-font-apply focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setNewItemsInput('');
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newItemsInput.trim()}
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add to Practice</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Drill Progress & Live Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
@@ -361,10 +583,10 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
               </span>
 
               {/* Romanized keystroke hint if available */}
-              {activeSubCategory.romanHints && activeSubCategory.romanHints[currentItem] && (
+              {currentRomanHint && (
                 <div className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-700 dark:text-slate-300 shadow-2xs">
                   <span className="text-slate-400 font-sans text-[11px]">Type Roman Keys:</span>
-                  <strong className="text-blue-600 dark:text-blue-400 font-bold">{activeSubCategory.romanHints[currentItem]}</strong>
+                  <strong className="text-blue-600 dark:text-blue-400 font-bold">{currentRomanHint}</strong>
                 </div>
               )}
 
@@ -399,34 +621,72 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
               </div>
 
               <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
-                Press <kbd className="font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300">Space</kbd> or <kbd className="font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300">Enter</kbd> to submit and proceed to the next word.
+                Type the Romanized keys for the target above. Completing the item will <strong className="text-blue-600 dark:text-blue-400">automatically advance</strong> to the next item immediately.
               </p>
             </div>
 
             {/* Category Items Sequence Preview */}
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2">
-                Drill Progress Items ({activeItems.length})
-              </span>
-              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Category Items ({activeItems.length})
+                  </span>
+                  {userCustomItemsForCurrentSubCat.length > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                      {userCustomItemsForCurrentSubCat.length} added by you
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsAddModalOpen((prev) => !prev)}
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ Add More</span>
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 max-h-40 overflow-y-auto pr-1">
                 {activeItems.map((item, idx) => {
                   const isCurrent = idx === currentIndex && !isDrillCompleted;
                   const isPassed = idx < currentIndex;
+                  const isUserCustom = userCustomItemsForCurrentSubCat.includes(item);
+
                   return (
                     <span
-                      key={idx}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all nepali-font-apply select-none ${
+                      key={`${item}-${idx}`}
+                      className={`group relative inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all nepali-font-apply select-none ${
                         isCurrent
                           ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-400 shadow-2xs'
                           : isPassed
                           ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900'
+                          : isUserCustom
+                          ? 'bg-blue-50/80 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800/80'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      {item}
+                      <span>{item}</span>
+                      {isUserCustom && (
+                        <button
+                          onClick={(e) => handleRemoveCustomItem(item, e)}
+                          title="Remove custom added item"
+                          className="opacity-60 hover:opacity-100 hover:text-rose-600 dark:hover:text-rose-400 ml-0.5 p-0.5 rounded transition-all cursor-pointer"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      )}
                     </span>
                   );
                 })}
+
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-dashed border-blue-300 dark:border-blue-800 transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Add</span>
+                </button>
               </div>
             </div>
           </div>
@@ -591,17 +851,23 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 mr-2">Drill Module:</span>
             {activeCategory.subCategories.map((sub) => {
               const isSelected = selectedSubCatId === sub.id;
+              const customCount = (customItemsMap[sub.id] || []).length;
               return (
                 <button
                   key={sub.id}
                   onClick={() => setSelectedSubCatId(sub.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                     isSelected
                       ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
                   <span>{sub.name}</span>
+                  {customCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+                      +{customCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -628,3 +894,4 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
     </div>
   );
 };
+
