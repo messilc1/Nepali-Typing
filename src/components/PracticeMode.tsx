@@ -78,6 +78,8 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
   const [typedInput, setTypedInput] = useState<string>('');
   const [romanBuffer, setRomanBuffer] = useState<string>('');
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [sentenceIndex, setSentenceIndex] = useState<number>(0);
+  const [wordIndexInSentence, setWordIndexInSentence] = useState<number>(0);
   const [completedCount, setCompletedCount] = useState<number>(0);
   const [mistakesCount, setMistakesCount] = useState<number>(0);
   const [activeItems, setActiveItems] = useState<string[]>([]);
@@ -124,6 +126,8 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       const combinedItems = [...subCat.items, ...userAdded];
       setActiveItems(combinedItems);
       setCurrentIndex(0);
+      setSentenceIndex(0);
+      setWordIndexInSentence(0);
       setTypedInput('');
       setRomanBuffer('');
       setCompletedCount(0);
@@ -140,7 +144,25 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
   const activeCategory = NEPALI_PRACTICE_DATA.find((c) => c.id === selectedCategoryId) || NEPALI_PRACTICE_DATA[0];
   const activeSubCategory =
     activeCategory.subCategories.find((s) => s.id === selectedSubCatId) || activeCategory.subCategories[0];
-  const currentItem = activeItems[currentIndex] || activeItems[0] || 'नेपाल';
+
+  const isSentenceCategory = activeCategory.id === 'sentence-practice';
+
+  // Sentence-specific data
+  const currentSentence = isSentenceCategory ? (activeItems[sentenceIndex] || activeItems[0] || '') : '';
+  const wordsInSentence = useMemo(() => {
+    if (!isSentenceCategory || !currentSentence) return [];
+    return currentSentence.split(/\s+/).filter((w) => w.trim().length > 0);
+  }, [isSentenceCategory, currentSentence]);
+
+  // Total words across all sentences for accurate progress
+  const totalSentenceWords = useMemo(() => {
+    if (!isSentenceCategory) return activeItems.length;
+    return activeItems.reduce((acc, sent) => acc + sent.split(/\s+/).filter((w) => w.trim().length > 0).length, 0);
+  }, [isSentenceCategory, activeItems]);
+
+  const currentItem = isSentenceCategory
+    ? (wordsInSentence[wordIndexInSentence] || wordsInSentence[0] || activeItems[0] || 'नेपाल')
+    : (activeItems[currentIndex] || activeItems[0] || 'नेपाल');
 
   const userCustomItemsForCurrentSubCat = useMemo(() => {
     return customItemsMap[selectedSubCatId] || [];
@@ -158,6 +180,8 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
     const shuffled = [...activeItems].sort(() => Math.random() - 0.5);
     setActiveItems(shuffled);
     setCurrentIndex(0);
+    setSentenceIndex(0);
+    setWordIndexInSentence(0);
     setTypedInput('');
     setRomanBuffer('');
     setStartTime(null);
@@ -167,6 +191,8 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
 
   const handleRestartDrill = () => {
     setCurrentIndex(0);
+    setSentenceIndex(0);
+    setWordIndexInSentence(0);
     setTypedInput('');
     setRomanBuffer('');
     setCompletedCount(0);
@@ -189,7 +215,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
 
     const parsedItems: string[] = [];
     for (const token of rawTokens) {
-      if (activeCategory.id !== 'sentences-drill' && activeCategory.id !== 'paragraphs-drill' && token.includes(' ')) {
+      if (!isSentenceCategory && token.includes(' ')) {
         const subTokens = token.split(/\s+/).filter((t) => t.trim().length > 0);
         parsedItems.push(...subTokens);
       } else {
@@ -235,6 +261,31 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
     }
   };
 
+  // Advance to next word/item or finish drill
+  const advanceToNext = () => {
+    setCompletedCount((prev) => prev + 1);
+    setTypedInput('');
+    setRomanBuffer('');
+    setRejectedKeyInfo(null);
+
+    if (isSentenceCategory) {
+      if (wordIndexInSentence + 1 < wordsInSentence.length) {
+        setWordIndexInSentence((prev) => prev + 1);
+      } else if (sentenceIndex + 1 < activeItems.length) {
+        setSentenceIndex((prev) => prev + 1);
+        setWordIndexInSentence(0);
+      } else {
+        setIsDrillCompleted(true);
+      }
+    } else {
+      if (currentIndex + 1 >= activeItems.length) {
+        setIsDrillCompleted(true);
+      } else {
+        setCurrentIndex((prev) => prev + 1);
+      }
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isDrillCompleted) return;
 
@@ -260,44 +311,50 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
       return;
     }
 
-    // Space or Enter key -> optional progression if user manually presses it
+    // Space or Enter key -> separator handling
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      const validation = validateStrictKeystroke({
-        targetWord: currentItem,
-        currentBuffer: currentBuf,
-        currentConverted: typedInput,
-        pressedKey: ' ',
-        language: settings.language,
-        isLastWord: false
-      });
 
-      if (!validation.isValid) {
-        playErrorSound(settings.soundVolume);
-        setMistakesCount((prev) => prev + 1);
-        setMistypedKeysMap((prev) => ({
-          ...prev,
-          [validation.expectedKey || 'Space']: (prev[validation.expectedKey || 'Space'] || 0) + 1
-        }));
-        setInputShake(true);
-        setRejectedKeyInfo({
-          key: 'Space',
-          expected: validation.expectedKey === ' ' ? 'Space' : validation.expectedKey
-        });
+      // If buffer is currently empty (e.g. user pressed Space right after word auto-completed)
+      if (romanBuffer === '' && typedInput === '') {
+        // Harmless trailing/word separator: play sound, never count as mistake
+        playKeypressSound(settings.sound, settings.soundVolume);
         return;
       }
 
-      playKeypressSound(settings.sound, settings.soundVolume);
-      setCompletedCount((prev) => prev + 1);
-      
-      if (currentIndex + 1 >= activeItems.length) {
-        setIsDrillCompleted(true);
-      } else {
-        setCurrentIndex((prev) => prev + 1);
-        setTypedInput('');
-        setRomanBuffer('');
-        setRejectedKeyInfo(null);
+      const cleanConverted = stripInvisibleCharacters(typedInput);
+      const targetRoman = getRomanizedHintForWord(cleanTarget);
+
+      // Check if current word is completed
+      const isWordComplete =
+        cleanConverted === cleanTarget ||
+        areDevanagariWordsEquivalent(cleanConverted, cleanTarget) ||
+        (cleanTarget.length > 0 &&
+          cleanConverted.replace(/्$/, '') === cleanTarget.replace(/्$/, '') &&
+          (cleanConverted.length >= cleanTarget.length || romanBuffer.length >= targetRoman.length)) ||
+        (targetRoman && targetRoman.length > 0 && romanBuffer.toLowerCase() === targetRoman.toLowerCase()) ||
+        (settings.language === 'english' &&
+          (typedInput.toLowerCase() === cleanTarget.toLowerCase() || isCharacterEquivalent(typedInput, cleanTarget)));
+
+      if (isWordComplete) {
+        playKeypressSound(settings.sound, settings.soundVolume);
+        advanceToNext();
+        return;
       }
+
+      // If word is incomplete and user pressed Space prematurely
+      playErrorSound(settings.soundVolume);
+      setMistakesCount((prev) => prev + 1);
+      const expectedChar = targetRoman[romanBuffer.length] || cleanTarget[cleanConverted.length] || '';
+      setMistypedKeysMap((prev) => ({
+        ...prev,
+        [expectedChar || 'Space']: (prev[expectedChar || 'Space'] || 0) + 1
+      }));
+      setInputShake(true);
+      setRejectedKeyInfo({
+        key: 'Space',
+        expected: expectedChar === ' ' ? 'Space' : (expectedChar || 'Letter')
+      });
       return;
     }
 
@@ -348,15 +405,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
           (validation.isWordComplete && (cleanConverted === cleanTarget || areDevanagariWordsEquivalent(cleanConverted, cleanTarget)));
 
         if (isItemComplete) {
-          setCompletedCount((prev) => prev + 1);
-          if (currentIndex + 1 >= activeItems.length) {
-            setIsDrillCompleted(true);
-          } else {
-            setCurrentIndex((prev) => prev + 1);
-            setTypedInput('');
-            setRomanBuffer('');
-            setRejectedKeyInfo(null);
-          }
+          advanceToNext();
         } else {
           setRomanBuffer(nextBuf);
           setTypedInput(nextDevanagari);
@@ -369,15 +418,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
           isCharacterEquivalent(nextBuf, cleanTarget);
 
         if (isItemComplete) {
-          setCompletedCount((prev) => prev + 1);
-          if (currentIndex + 1 >= activeItems.length) {
-            setIsDrillCompleted(true);
-          } else {
-            setCurrentIndex((prev) => prev + 1);
-            setTypedInput('');
-            setRomanBuffer('');
-            setRejectedKeyInfo(null);
-          }
+          advanceToNext();
         } else {
           setTypedInput(nextBuf);
         }
@@ -386,6 +427,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
   };
 
   // Performance calculations
+  const totalTargetCount = isSentenceCategory ? totalSentenceWords : activeItems.length;
   const totalKeystrokes = completedCount * 4 + typedInput.length + mistakesCount;
   const accuracy = totalKeystrokes > 0 ? Math.max(0, Math.round(((totalKeystrokes - mistakesCount) / totalKeystrokes) * 100)) : 100;
   const timeInMinutes = Math.max(elapsedSeconds / 60, 0.05);
@@ -537,7 +579,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80">
             <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Progress</span>
             <span className="text-base font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 block">
-              {completedCount} / {activeItems.length}
+              {completedCount} / {totalTargetCount}
             </span>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80">
@@ -563,6 +605,37 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
         {/* Active Drill Card or Completion Screen */}
         {!isDrillCompleted ? (
           <div className="space-y-6">
+            {/* Full Sentence Context Tracker (Displayed during Sentence Practice) */}
+            {isSentenceCategory && wordsInSentence.length > 0 && (
+              <div className="w-full bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 rounded-xl p-4 text-center animate-fadeIn space-y-2">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center justify-center gap-2">
+                  <span>Sentence {sentenceIndex + 1} of {activeItems.length}</span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span>Word {wordIndexInSentence + 1} of {wordsInSentence.length}</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 text-base sm:text-lg nepali-font-apply">
+                  {wordsInSentence.map((w, wIdx) => {
+                    const isPassed = wIdx < wordIndexInSentence;
+                    const isCurrent = wIdx === wordIndexInSentence;
+                    return (
+                      <span
+                        key={`${w}-${wIdx}`}
+                        className={`px-2.5 py-1 rounded-lg transition-all select-none ${
+                          isCurrent
+                            ? 'bg-blue-600 text-white font-extrabold ring-2 ring-blue-400 shadow-2xs'
+                            : isPassed
+                            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/60 font-semibold'
+                            : 'text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/60'
+                        }`}
+                      >
+                        {w}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Target Character / Word Hero Display */}
             <div
               className={`p-8 sm:p-10 rounded-2xl border transition-all text-center flex flex-col items-center justify-center min-h-[190px] relative ${
@@ -572,7 +645,9 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
               }`}
             >
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-                Target Character / Word ({currentIndex + 1} of {activeItems.length})
+                {isSentenceCategory
+                  ? `Current Word (${wordIndexInSentence + 1} of ${wordsInSentence.length})`
+                  : `Target Item (${currentIndex + 1} of ${activeItems.length})`}
               </span>
 
               <span
@@ -621,7 +696,9 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
               </div>
 
               <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
-                Type the Romanized keys for the target above. Completing the item will <strong className="text-blue-600 dark:text-blue-400">automatically advance</strong> to the next item immediately.
+                {isSentenceCategory
+                  ? 'Type Romanized keys for the current word. Pressing Space after finishing a word moves to the next word naturally.'
+                  : 'Type Romanized keys for the target above. Completing the item advances automatically to the next item.'}
               </p>
             </div>
 
@@ -801,7 +878,7 @@ export const PracticeMode: React.FC<PracticeModeProps> = ({
         </div>
 
         {/* Main Category Selector Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {filteredCategories.map((cat) => {
             const isSelected = selectedCategoryId === cat.id;
             return (

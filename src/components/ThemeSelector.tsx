@@ -22,11 +22,11 @@ export interface ThemeOption {
 export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: 'white',
-    label: 'White Mode',
-    shortLabel: 'White',
+    label: 'Light Mode',
+    shortLabel: 'Light',
     emoji: '☀️',
     icon: Sun,
-    description: 'Clean, pure white focus interface'
+    description: 'Soft neutral daylight theme with high contrast'
   },
   {
     id: 'black',

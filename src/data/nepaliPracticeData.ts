@@ -363,54 +363,8 @@ export const NEPALI_PRACTICE_DATA: NepaliPracticeCategory[] = [
         ]
       }
     ]
-  },
-
-  // 6. PARAGRAPH PRACTICE (अनुच्छेद अभ्यास)
-  {
-    id: 'paragraph-practice',
-    name: 'Paragraph Practice',
-    nepaliName: 'अनुच्छेद अभ्यास',
-    description: 'Complete multi-sentence paragraphs for continuous speed building, stamina, and Lok Sewa exam preparation.',
-    difficulty: 'Expert',
-    subCategories: [
-      {
-        id: 'para-general-nepal',
-        name: 'General Nepali Paragraph (नेपालको प्राकृतिक तथा सांस्कृतिक सम्पदा)',
-        nepaliName: 'सामान्य नेपाली अनुच्छेद',
-        description: 'Cultural, historical, and geographical prose highlighting Nepal.',
-        items: [
-          'नेपाल प्राकृतिक सौन्दर्य, जैविक विविधता तथा सांस्कृतिक सम्पन्नताले भरिपूर्ण एक अद्वितीय राष्ट्र हो। सर्वोच्च शिखर सगरमाथादेखि शान्तिका अग्रदूत गौतम बुद्धको जन्मस्थल लुम्बिनीसम्मका गौरवशाली धरोहरहरू यसै भूमिमा अवस्थित छन्। यहाँका विभिन्न जातजाति, भाषाभाषी र संस्कृतिबीचको पारस्परिक सद्भाव र सहिष्णुताले नेपाली राष्ट्रियतालाई सधैं सुदृढ बनाएको छ। प्राकृतिक सम्पदाको दिगो संरक्षण र पर्यटन प्रवर्द्धनबाट मुलुकलाई समृद्धिको मार्गमा अघि बढाउन सकिन्छ।'
-        ]
-      },
-      {
-        id: 'para-loksewa-admin',
-        name: 'Administrative / Lok Sewa Paragraph (सुशासन तथा सार्वजनिक सेवा प्रवाह)',
-        nepaliName: 'प्रशासनिक तथा लोक सेवा अनुच्छेद',
-        description: 'Public administration principles, civil service ethics, and governance standards.',
-        items: [
-          'सुशासन भनेको राज्यको स्रोत र साधनको प्रभावकारी, न्यायोचित, पारदर्शी तथा जनउत्तरदायी ढंगले परिचालन गरी नागरिकको जीवनस्तर उकास्नु हो। विधिको शासन, जवाफदेहिता, पारदर्शिता, सहभागितामूलकता, निष्पक्षता र प्रभावकारिता सुशासनका अनिवार्य पूर्वसर्त हुन्। जबसम्म राज्य संयन्त्रले नागरिकलाई केन्द्रविन्दुमा राखेर सेवा प्रवाह गर्दैन, तबसम्म लोकतन्त्रको वास्तविक लाभ तल्लो तहसम्म पुग्न सक्दैन। निजामती सेवाले निष्पक्ष र प्रभावकारी भूमिका निर्वाह गर्नुपर्दछ।'
-        ]
-      },
-      {
-        id: 'para-legal-constitution',
-        name: 'Legal & Constitutional Paragraph (नेपालको संविधान र कानूनी राज्य)',
-        nepaliName: 'कानूनी तथा संवैधानिक अनुच्छेद',
-        description: 'Constitutional preamble, rule of law, and Supreme Court jurisdiction.',
-        items: [
-          'हामी सार्वभौमसत्तासम्पन्न नेपाली जनता, नेपालको स्वतन्त्रता, सार्वभौमिकता, भौगोलिक अखण्डता, राष्ट्रिय एकता, स्वाधीनता र स्वाभिमानलाई अक्षुण्ण राखी जनताको प्रतिस्पर्धात्मक बहुदलीय लोकतान्त्रिक शासन प्रणाली, नागरिक स्वतन्त्रता, मौलिक अधिकार, मानव अधिकार, बालिग मताधिकार, आवधिक निर्वाचन, पूर्ण प्रेस स्वतन्त्रता तथा स्वतन्त्र, निष्पक्ष र सक्षम न्यायपालिका र कानूनी राज्यको अवधारणा लगायतका लोकतान्त्रिक मूल्य र मान्यतामा आधारित समाजवादप्रति प्रतिबद्ध रही समृद्ध राष्ट्र निर्माण गर्न यो संविधान जारी गर्दछौं।'
-        ]
-      },
-      {
-        id: 'para-government-tech',
-        name: 'Government Terminology & Digital Framework (डिजिटल नेपाल र सूचना प्रविधि)',
-        nepaliName: 'सरकारी नीति तथा प्रविधि अनुच्छेद',
-        description: 'Modern policy framework, e-governance, and public digital infrastructure.',
-        items: [
-          'एक्काइसौं शताब्दीमा सूचना तथा सञ्चार प्रविधिको विकासले विश्वलाई एउटा सानो गाउँमा परिणत गरिदिएको छ। डिजिटल नेपाल फ्रेमवर्क अन्तर्गत सरकारी कामकाज, शिक्षा, स्वास्थ्य, वित्तीय कारोबार र कृषि क्षेत्रलाई डिजिटलाइज गर्ने प्रयासहरू भइरहेका छन्। कम्प्युटर टाइपिंग दक्षता, सफ्टवेयर विकास र इन्टरनेटको सही प्रयोगले युवा पुस्तालाई विश्व बजारमा प्रतिस्पर्धी बनाउन मद्दत गर्दछ। नागरिकलाई घरदैलोमै डिजिटल सेवा पुर्याउनु आजको प्रमुख आवश्यकता हो।'
-        ]
-      }
-    ]
   }
 ];
 
-export const DIFFICULTY_LEVEL_TABS = ['All', 'Beginner', 'Basic', 'Intermediate', 'Advanced', 'Expert'] as const;
+export const DIFFICULTY_LEVEL_TABS = ['All', 'Beginner', 'Basic', 'Intermediate', 'Advanced'] as const;
+

@@ -13,21 +13,22 @@
   --app-input-bg: #ffffff;
 }
 
-/* 1. White Mode (☀️ Genuinely Clean, Pure White Interface) */
+/* 1. White / Light Mode (☀️ Soft Neutral Canvas with Crisp Card Separation & High Contrast) */
 html.theme-white,
 html[data-theme="white"] {
   color-scheme: light;
-  --app-bg: #ffffff;
+  --app-bg: #f1f5f9;
   --app-card-bg: #ffffff;
-  --app-card-border: #e2e8f0;
+  --app-card-border: #cbd5e1;
   --app-text: #0f172a;
-  --app-text-muted: #64748b;
+  --app-text-muted: #475569;
   --app-typing-bg: #ffffff;
+  --app-input-bg: #ffffff;
 }
 
 html.theme-white body,
 html[data-theme="white"] body {
-  background-color: #ffffff !important;
+  background-color: #f1f5f9 !important;
   color: #0f172a !important;
 }
 
@@ -35,14 +36,38 @@ html.theme-white #root,
 html[data-theme="white"] #root,
 html.theme-white .min-h-screen,
 html[data-theme="white"] .min-h-screen {
-  background-color: #ffffff !important;
+  background-color: #f1f5f9 !important;
   color: #0f172a !important;
 }
 
 html.theme-white header#main-navbar,
 html[data-theme="white"] header#main-navbar {
   background-color: rgba(255, 255, 255, 0.98) !important;
-  border-color: #e2e8f0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+}
+
+/* Crisp card separation in light mode */
+html.theme-white .bg-white,
+html[data-theme="white"] .bg-white {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0;
+}
+
+html.theme-white .bg-slate-50,
+html[data-theme="white"] .bg-slate-50 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0;
+}
+
+html.theme-white .text-slate-400,
+html[data-theme="white"] .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.theme-white .text-slate-500,
+html[data-theme="white"] .text-slate-500 {
+  color: #475569 !important;
 }
 
 /* 2. Black Mode (🖤 True OLED Black Interface) */
