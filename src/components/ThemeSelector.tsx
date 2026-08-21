@@ -1,50 +1,64 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Moon, Sun, Laptop, ShieldAlert, Check, ChevronDown } from 'lucide-react';
+import { Moon, Sun, Laptop, ShieldAlert, Check, ChevronDown, Circle } from 'lucide-react';
 import { ThemeType } from '../types';
 
 interface ThemeSelectorProps {
   currentTheme: ThemeType;
   onSelectTheme: (theme: ThemeType) => void;
   variant?: 'navbar' | 'compact' | 'dropdown' | 'segmented';
+  compact?: boolean;
   className?: string;
 }
 
-interface ThemeOption {
+export interface ThemeOption {
   id: ThemeType;
   label: string;
   shortLabel: string;
   icon: React.ComponentType<{ className?: string }>;
   description: string;
+  emoji: string;
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
   {
+    id: 'white',
+    label: 'White Mode',
+    shortLabel: 'White',
+    emoji: '☀️',
+    icon: Sun,
+    description: 'Clean, pure white focus interface'
+  },
+  {
+    id: 'black',
+    label: 'Black Mode',
+    shortLabel: 'Black',
+    emoji: '🖤',
+    icon: Circle,
+    description: 'True OLED black for minimal eye strain'
+  },
+  {
     id: 'dark',
     label: 'Dark Mode',
     shortLabel: 'Dark',
+    emoji: '🌙',
     icon: Moon,
-    description: 'Deep slate background with high readability'
-  },
-  {
-    id: 'white-blue',
-    label: 'Light Mode',
-    shortLabel: 'Light',
-    icon: Sun,
-    description: 'Clean crisp light appearance'
+    description: 'Comfortable soft slate gray night theme'
   },
   {
     id: 'system',
-    label: 'System Default',
+    label: 'System Mode',
     shortLabel: 'System',
+    emoji: '💻',
     icon: Laptop,
-    description: 'Follows your operating system theme'
+    description: 'Auto-syncs with your OS light/dark mode'
   },
   {
     id: 'high-contrast-blue',
     label: 'High Contrast',
     shortLabel: 'Contrast',
+    emoji: '🔷',
     icon: ShieldAlert,
-    description: 'Maximum contrast dark blue theme'
+    description: 'High visibility deep navy blue'
   }
 ];
 
@@ -52,6 +66,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
   currentTheme,
   onSelectTheme,
   variant = 'navbar',
+  compact = false,
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,7 +86,9 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
     };
   }, [isOpen]);
 
-  const activeOption = THEME_OPTIONS.find((t) => t.id === currentTheme) || THEME_OPTIONS[1];
+  // Normalize legacy theme values
+  const normalizedTheme = (currentTheme as string) === 'white-blue' || (currentTheme as string) === 'light' ? 'white' : currentTheme;
+  const activeOption = THEME_OPTIONS.find((t) => t.id === normalizedTheme) || THEME_OPTIONS[0];
   const ActiveIcon = activeOption.icon;
 
   if (variant === 'segmented') {
@@ -82,7 +99,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
       >
         {THEME_OPTIONS.map((opt) => {
           const Icon = opt.icon;
-          const isSelected = currentTheme === opt.id;
+          const isSelected = normalizedTheme === opt.id;
           return (
             <button
               key={opt.id}
@@ -111,10 +128,10 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
         id="btn-theme-selector"
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        title={`Theme: ${activeOption.label}. Click to switch theme.`}
+        title={`Current Theme: ${activeOption.label} (${activeOption.description}). Click to switch.`}
         className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 h-8 sm:h-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
       >
-        <ActiveIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+        <span className="text-sm leading-none">{activeOption.emoji}</span>
         <span className="hidden sm:inline font-medium">{activeOption.shortLabel}</span>
         <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
       </button>
@@ -122,17 +139,17 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
       {isOpen && (
         <div
           id="theme-selector-menu"
-          className="absolute right-0 mt-1.5 w-52 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-1.5 z-50 animate-fadeIn"
+          className="absolute right-0 mt-1.5 w-60 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-1.5 z-50 animate-fadeIn"
         >
-          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800/80 mb-1">
+          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800/80 mb-1 flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Appearance Theme
+              Select Theme / Appearance
             </span>
           </div>
 
           {THEME_OPTIONS.map((opt) => {
             const Icon = opt.icon;
-            const isSelected = currentTheme === opt.id;
+            const isSelected = normalizedTheme === opt.id;
             return (
               <button
                 key={opt.id}
@@ -148,7 +165,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Icon className={`w-4 h-4 ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
+                  <span className="text-base leading-none shrink-0">{opt.emoji}</span>
                   <div className="text-left">
                     <div className="font-semibold leading-tight">{opt.label}</div>
                     <div className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">{opt.description}</div>

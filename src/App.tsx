@@ -17,7 +17,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { CustomParagraphModal } from './components/CustomParagraphModal';
 import { CustomTextModal } from './components/CustomTextModal';
 
-import { TestSettings, TestResult, UserStats, KeyStats, LiveStats, NavigationTab } from './types';
+import { TestSettings, TestResult, UserStats, KeyStats, LiveStats, NavigationTab, ThemeType } from './types';
 import { applyGlobalNepaliFont, getStoredNepaliFont } from './utils/fonts';
 import { ensureLokSewaMinimumWords } from './utils/lokSewaEvaluation';
 import {
@@ -40,7 +40,7 @@ const DEFAULT_SETTINGS: TestSettings = {
   difficulty: 'medium',
   fontSize: 'md',
   fontFamily: getStoredNepaliFont(),
-  theme: 'white-blue',
+  theme: (localStorage.getItem('nepali_typing_theme') as ThemeType) || 'white',
   sound: 'click',
   soundVolume: 0.5,
   showLiveWpm: true,
@@ -228,20 +228,44 @@ export default function App() {
   // Apply Theme Classes & System Theme Listener
   useEffect(() => {
     const root = document.documentElement;
+    const body = document.body;
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     const applyTheme = () => {
-      root.classList.remove('dark', 'high-contrast-blue');
-      if (settings.theme === 'dark') {
-        root.classList.add('dark');
-      } else if (settings.theme === 'high-contrast-blue') {
-        root.classList.add('high-contrast-blue');
-      } else if (settings.theme === 'system') {
-        if (mediaQuery.matches) {
-          root.classList.add('dark');
-        }
+      // Remove previous theme classes
+      root.classList.remove('dark', 'theme-white', 'theme-black', 'theme-dark', 'theme-high-contrast');
+      body.classList.remove('dark', 'theme-white', 'theme-black', 'theme-dark', 'theme-high-contrast');
+
+      let current = settings.theme;
+      // Handle legacy theme values
+      if ((current as string) === 'white-blue' || (current as string) === 'light') {
+        current = 'white';
       }
-      // 'light' is default (neither dark nor high-contrast-blue class)
+
+      if (current === 'system') {
+        const isSystemDark = mediaQuery.matches;
+        current = isSystemDark ? 'dark' : 'white';
+      }
+
+      root.setAttribute('data-theme', current);
+      body.setAttribute('data-theme', current);
+
+      if (current === 'white') {
+        root.classList.add('theme-white');
+        body.classList.add('theme-white');
+      } else if (current === 'black') {
+        root.classList.add('dark', 'theme-black');
+        body.classList.add('dark', 'theme-black');
+      } else if (current === 'dark') {
+        root.classList.add('dark', 'theme-dark');
+        body.classList.add('dark', 'theme-dark');
+      } else if (current === 'high-contrast-blue') {
+        root.classList.add('dark', 'theme-high-contrast');
+        body.classList.add('dark', 'theme-high-contrast');
+      }
+
+      // Keep persistent storage synced
+      localStorage.setItem('nepali_typing_theme', settings.theme);
     };
 
     applyTheme();

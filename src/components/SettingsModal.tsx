@@ -158,14 +158,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                     Color Theme
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
                     {[
-                      { id: 'dark', label: 'Dark Mode 🌙', desc: 'Night mode, deep slate' },
-                      { id: 'light', label: 'Light Mode ☀️', desc: 'Crisp, high-focus light' },
-                      { id: 'system', label: 'System Default 💻', desc: 'Auto-syncs with OS' },
+                      { id: 'white', label: 'White Mode ☀️', desc: 'Clean, pure white light' },
+                      { id: 'black', label: 'Black Mode 🖤', desc: 'True OLED black' },
+                      { id: 'dark', label: 'Dark Mode 🌙', desc: 'Soft slate gray' },
+                      { id: 'system', label: 'System 💻', desc: 'Auto-syncs with OS' },
                       { id: 'high-contrast-blue', label: 'High Contrast 🔷', desc: 'Maximum accessibility' }
                     ].map(thm => {
-                      const isSelected = settings.theme === thm.id || (thm.id === 'light' && settings.theme === 'white-blue');
+                      const normalized = (settings.theme as string) === 'white-blue' || (settings.theme as string) === 'light' ? 'white' : settings.theme;
+                      const isSelected = normalized === thm.id;
                       return (
                         <button
                           key={thm.id}

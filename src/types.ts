@@ -79,7 +79,7 @@ export interface CertificationAttempt {
 export type TestType = 'time' | 'words' | 'custom' | 'paragraph' | 'legal' | 'quote';
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'expert';
-export type ThemeType = 'dark' | 'light' | 'white-blue' | 'system' | 'high-contrast-blue';
+export type ThemeType = 'white' | 'dark' | 'black' | 'system' | 'high-contrast-blue' | 'light' | 'white-blue';
 
 export interface TestSettings {
   language: LanguageMode;
