@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileText,
   Clock,
@@ -12,11 +12,18 @@ import {
   CheckCircle2,
   ShieldCheck,
   Globe,
-  Info
+  Info,
+  Bookmark,
+  Plus,
+  Save,
+  Check,
+  X,
+  Star
 } from 'lucide-react';
-import { LanguageMode, TestSettings } from '../types';
+import { LanguageMode } from '../types';
 import { SAMPLE_PARAGRAPHS } from '../data/wordPacks';
 import { ENGLISH_PARAGRAPH_TESTS } from '../data/englishCourseData';
+import { expandTextToWordCount, countWords } from '../utils/textRepetition';
 
 export interface CustomTypingConfig {
   text: string;
@@ -29,6 +36,20 @@ export interface CustomTypingConfig {
   showHints?: boolean;
 }
 
+export interface CustomTypingPreset {
+  id: string;
+  name: string;
+  language: LanguageMode;
+  text: string;
+  wordCountLimit: number | null;
+  timeLimitSeconds: number | null;
+  lokSewaMode: boolean;
+  mistakeMode: 'strict' | 'allow';
+  backspaceEnabled: boolean;
+  showHints: boolean;
+  isDefault?: boolean;
+}
+
 interface CustomTypingViewProps {
   initialLanguage?: LanguageMode;
   initialText?: string;
@@ -38,15 +59,46 @@ interface CustomTypingViewProps {
   isModalMode?: boolean;
 }
 
-const PRESET_WORD_COUNTS = [50, 100, 150, 200, 300, 500];
-const PRESET_TIMES = [
-  { label: '30s', seconds: 30 },
-  { label: '60s (1m)', seconds: 60 },
-  { label: '2m', seconds: 120 },
-  { label: '3m', seconds: 180 },
-  { label: '4m', seconds: 240 },
-  { label: '5m', seconds: 300 },
-  { label: '10m', seconds: 600 }
+const PRESETS_STORAGE_KEY = 'nepali_typing_custom_presets';
+
+const DEFAULT_PRESETS: CustomTypingPreset[] = [
+  {
+    id: 'preset-loksewa-5min',
+    name: '🇳🇵 Lok Sewa 5-Min Model Exam',
+    language: 'nepali',
+    text: SAMPLE_PARAGRAPHS.constitution,
+    wordCountLimit: null,
+    timeLimitSeconds: 300,
+    lokSewaMode: true,
+    mistakeMode: 'strict',
+    backspaceEnabled: true,
+    showHints: true,
+    isDefault: true
+  },
+  {
+    id: 'preset-quick-200words',
+    name: '🇳🇵 200-Word Legal Sprint',
+    language: 'nepali',
+    text: SAMPLE_PARAGRAPHS.supreme_court_judgment,
+    wordCountLimit: 200,
+    timeLimitSeconds: null,
+    lokSewaMode: false,
+    mistakeMode: 'strict',
+    backspaceEnabled: true,
+    showHints: false
+  },
+  {
+    id: 'preset-eng-speed-3min',
+    name: '🇬🇧 English 3-Minute Speed Test',
+    language: 'english',
+    text: ENGLISH_PARAGRAPH_TESTS[0]?.text || 'The civil service examination tests speed, accuracy, and endurance.',
+    wordCountLimit: null,
+    timeLimitSeconds: 180,
+    lokSewaMode: false,
+    mistakeMode: 'strict',
+    backspaceEnabled: true,
+    showHints: true
+  }
 ];
 
 export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
@@ -60,20 +112,20 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
   const [language, setLanguage] = useState<LanguageMode>(initialLanguage);
   const [text, setText] = useState<string>(initialText);
 
-  // Word count mode: 'unlimited' | 'preset' | 'custom'
-  const [wordMode, setWordMode] = useState<'unlimited' | 'custom'>(() => {
-    return initialWordCount !== null && initialWordCount > 0 ? 'custom' : 'unlimited';
+  // Word count limit state
+  const [wordLimitMode, setWordLimitMode] = useState<'unlimited' | 'limit'>(() => {
+    return initialWordCount !== null && initialWordCount > 0 ? 'limit' : 'unlimited';
   });
-  const [selectedWordCount, setSelectedWordCount] = useState<number>(initialWordCount || 200);
-  const [customWordInput, setCustomWordInput] = useState<string>(
+  const [selectedWordLimit, setSelectedWordLimit] = useState<number>(initialWordCount || 200);
+  const [customWordLimitInput, setCustomWordLimitInput] = useState<string>(
     initialWordCount ? initialWordCount.toString() : '200'
   );
 
-  // Time mode: 'unlimited' | 'preset' | 'custom'
-  const [timeMode, setTimeMode] = useState<'unlimited' | 'custom'>(() => {
-    return initialTimeSeconds !== null && initialTimeSeconds > 0 ? 'custom' : 'custom';
+  // Time limit state
+  const [timeLimitMode, setTimeLimitMode] = useState<'unlimited' | 'limit'>(() => {
+    return initialTimeSeconds !== null && initialTimeSeconds > 0 ? 'limit' : 'limit';
   });
-  const [selectedTimeSeconds, setSelectedTimeSeconds] = useState<number>(initialTimeSeconds ?? 300);
+  const [selectedTimeLimitSec, setSelectedTimeLimitSec] = useState<number>(initialTimeSeconds ?? 300);
   const [customMinInput, setCustomMinInput] = useState<string>('5');
   const [customSecInput, setCustomSecInput] = useState<string>('0');
 
@@ -84,13 +136,37 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
   const [backspaceEnabled, setBackspaceEnabled] = useState<boolean>(true);
   const [showHints, setShowHints] = useState<boolean>(true);
 
+  // Presets management
+  const [presets, setPresets] = useState<CustomTypingPreset[]>(() => {
+    try {
+      const saved = localStorage.getItem(PRESETS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_PRESETS;
+  });
+
+  const [activePresetId, setActivePresetId] = useState<string>('');
+  const [showSavePresetDialog, setShowSavePresetDialog] = useState<boolean>(false);
+  const [newPresetName, setNewPresetName] = useState<string>('');
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('');
+
+  // Persist presets
+  useEffect(() => {
+    try {
+      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+    } catch {}
+  }, [presets]);
+
   // Analyze text stats
   const stats = useMemo(() => {
     const trimmed = text.trim();
     if (!trimmed) {
       return { chars: 0, words: 0, lines: 0 };
     }
-    const words = trimmed.split(/\s+/).filter(Boolean).length;
+    const words = countWords(trimmed);
     const chars = trimmed.length;
     const lines = trimmed.split('\n').length;
     return { chars, words, lines };
@@ -98,24 +174,25 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
 
   // Compute effective word count limit
   const effectiveWordLimit = useMemo((): number | null => {
-    if (wordMode === 'unlimited') return null;
-    const customNum = parseInt(customWordInput, 10);
-    return !isNaN(customNum) && customNum > 0 ? customNum : selectedWordCount;
-  }, [wordMode, customWordInput, selectedWordCount]);
+    if (wordLimitMode === 'unlimited') return null;
+    const customNum = parseInt(customWordLimitInput, 10);
+    return !isNaN(customNum) && customNum > 0 ? customNum : selectedWordLimit;
+  }, [wordLimitMode, customWordLimitInput, selectedWordLimit]);
 
   // Compute effective time limit
   const effectiveTimeLimitSeconds = useMemo((): number | null => {
     if (lokSewaMode) return 300; // 5 minutes standard for Lok Sewa
-    if (timeMode === 'unlimited') return null;
+    if (timeLimitMode === 'unlimited') return null;
     const min = parseInt(customMinInput, 10) || 0;
     const sec = parseInt(customSecInput, 10) || 0;
     const total = min * 60 + sec;
-    return total > 0 ? total : selectedTimeSeconds;
-  }, [lokSewaMode, timeMode, customMinInput, customSecInput, selectedTimeSeconds]);
+    return total > 0 ? total : selectedTimeLimitSec;
+  }, [lokSewaMode, timeLimitMode, customMinInput, customSecInput, selectedTimeLimitSec]);
 
   // Quick Sample Insertion
   const handleLoadSample = (sampleText: string) => {
     setText(sampleText.trim());
+    setActivePresetId('');
   };
 
   const handlePasteClipboard = async () => {
@@ -123,17 +200,99 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
       const clipText = await navigator.clipboard.readText();
       if (clipText) {
         setText(prev => (prev ? prev + '\n' + clipText : clipText));
+        setActivePresetId('');
       }
     } catch {
       // Clipboard permission denied or unsupported
     }
   };
 
+  // Preset operations
+  const handleLoadPreset = (presetId: string) => {
+    const preset = presets.find(p => p.id === presetId);
+    if (!preset) return;
+    setActivePresetId(preset.id);
+    setLanguage(preset.language);
+    setText(preset.text);
+    if (preset.wordCountLimit) {
+      setWordLimitMode('limit');
+      setSelectedWordLimit(preset.wordCountLimit);
+      setCustomWordLimitInput(preset.wordCountLimit.toString());
+    } else {
+      setWordLimitMode('unlimited');
+    }
+
+    if (preset.timeLimitSeconds) {
+      setTimeLimitMode('limit');
+      setSelectedTimeLimitSec(preset.timeLimitSeconds);
+      const min = Math.floor(preset.timeLimitSeconds / 60);
+      const sec = preset.timeLimitSeconds % 60;
+      setCustomMinInput(min.toString());
+      setCustomSecInput(sec.toString());
+    } else {
+      setTimeLimitMode('unlimited');
+    }
+
+    setLokSewaMode(preset.lokSewaMode);
+    setMistakeMode(preset.mistakeMode);
+    setBackspaceEnabled(preset.backspaceEnabled);
+    setShowHints(preset.showHints);
+  };
+
+  const handleSaveCurrentAsPreset = () => {
+    if (!newPresetName.trim() || !text.trim()) return;
+    const newPreset: CustomTypingPreset = {
+      id: `preset-${Date.now()}`,
+      name: newPresetName.trim(),
+      language,
+      text: text.trim(),
+      wordCountLimit: effectiveWordLimit,
+      timeLimitSeconds: effectiveTimeLimitSeconds,
+      lokSewaMode,
+      mistakeMode,
+      backspaceEnabled,
+      showHints
+    };
+    setPresets(prev => [newPreset, ...prev]);
+    setActivePresetId(newPreset.id);
+    setShowSavePresetDialog(false);
+    setNewPresetName('');
+    setSaveSuccessMsg('Preset saved successfully!');
+    setTimeout(() => setSaveSuccessMsg(''), 3000);
+  };
+
+  const handleDeletePreset = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPresets(prev => prev.filter(p => p.id !== id));
+    if (activePresetId === id) setActivePresetId('');
+  };
+
+  const handleResetToDefault = () => {
+    setLanguage('nepali');
+    setText(SAMPLE_PARAGRAPHS.constitution);
+    setWordLimitMode('unlimited');
+    setTimeLimitMode('limit');
+    setSelectedTimeLimitSec(300);
+    setCustomMinInput('5');
+    setCustomSecInput('0');
+    setLokSewaMode(false);
+    setMistakeMode('strict');
+    setBackspaceEnabled(true);
+    setShowHints(true);
+    setActivePresetId('');
+  };
+
   const handleStart = () => {
     if (!text.trim()) return;
 
+    let targetText = text.trim();
+    // Repetition check: if effectiveWordLimit is greater than text words, expand text automatically
+    if (effectiveWordLimit && effectiveWordLimit > stats.words && stats.words > 0) {
+      targetText = expandTextToWordCount(targetText, effectiveWordLimit);
+    }
+
     onStartTest({
-      text: text.trim(),
+      text: targetText,
       language,
       wordCountLimit: effectiveWordLimit,
       timeLimitSeconds: effectiveTimeLimitSeconds,
@@ -163,7 +322,7 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
                 <span>Custom Typing Studio</span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Paste or create custom text with flexible word counts, custom timers, and exam rules.
+                Paste or write your custom text, configure word count & timers, and save reusable presets.
               </p>
             </div>
           </div>
@@ -173,7 +332,12 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shrink-0">
           <button
             type="button"
-            onClick={() => setLanguage('nepali')}
+            onClick={() => {
+              setLanguage('nepali');
+              if (!text || text === (ENGLISH_PARAGRAPH_TESTS[0]?.text || '')) {
+                setText(SAMPLE_PARAGRAPHS.constitution);
+              }
+            }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               language === 'nepali'
                 ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
@@ -185,7 +349,12 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setLanguage('english')}
+            onClick={() => {
+              setLanguage('english');
+              if (!text || text === SAMPLE_PARAGRAPHS.constitution) {
+                setText(ENGLISH_PARAGRAPH_TESTS[0]?.text || '');
+              }
+            }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               language === 'english'
                 ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
@@ -197,8 +366,97 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
         </div>
       </div>
 
+      {/* Preset Selector & Management Bar */}
+      <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+            <Bookmark className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Preset:</span>
+          </span>
+
+          <select
+            value={activePresetId}
+            onChange={(e) => handleLoadPreset(e.target.value)}
+            className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="">— Select Saved Preset —</option>
+            {presets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.language === 'nepali' ? 'Nepali' : 'English'})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSavePresetDialog(true)}
+            className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 font-bold transition-all flex items-center gap-1 cursor-pointer"
+            title="Save current text & settings as a named preset"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>Save Preset</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleResetToDefault}
+            className="px-2.5 py-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-all font-medium cursor-pointer"
+            title="Reset to recommended default settings"
+          >
+            Reset Defaults
+          </button>
+        </div>
+      </div>
+
+      {/* Save Preset Dialog Modal / Box */}
+      {showSavePresetDialog && (
+        <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 space-y-3 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-xs text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+              <Save className="w-4 h-4 text-blue-600" />
+              <span>Save Current Configuration as Preset</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowSavePresetDialog(false)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              placeholder="e.g. My 5-Minute Lok Sewa Model Set"
+              className="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={handleSaveCurrentAsPreset}
+              disabled={!newPresetName.trim() || !text.trim()}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition-all cursor-pointer"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {saveSuccessMsg && (
+        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+          <Check className="w-4 h-4" />
+          <span>{saveSuccessMsg}</span>
+        </div>
+      )}
+
       {/* Editor Main Area */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <Type className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -313,303 +571,320 @@ export const CustomTypingView: React.FC<CustomTypingViewProps> = ({
 
       {/* Test Conditions Controls: Word Count + Time */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-        
         {/* 1. WORD COUNT CONFIGURATION */}
         <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
               <Type className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Word Count Target</span>
+              <span>Word Limit Target</span>
             </span>
 
-            {/* Unlimited vs Custom Selector */}
-            <div className="flex items-center gap-3 text-xs font-medium">
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-                <input
-                  type="radio"
-                  name="wordMode"
-                  checked={wordMode === 'unlimited'}
-                  onChange={() => setWordMode('unlimited')}
-                  className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Unlimited</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-                <input
-                  type="radio"
-                  name="wordMode"
-                  checked={wordMode === 'custom'}
-                  onChange={() => setWordMode('custom')}
-                  className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Set Words</span>
-              </label>
+            <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 dark:bg-slate-700/70 rounded-lg text-[11px] font-semibold">
+              <button
+                type="button"
+                onClick={() => setWordLimitMode('unlimited')}
+                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                  wordLimitMode === 'unlimited'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Unlimited
+              </button>
+              <button
+                type="button"
+                onClick={() => setWordLimitMode('limit')}
+                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                  wordLimitMode === 'limit'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Fixed Limit
+              </button>
             </div>
           </div>
 
-          {/* Word Count Presets & Custom Input */}
-          {wordMode === 'custom' ? (
-            <div className="space-y-2.5 animate-fadeIn">
+          {wordLimitMode === 'limit' ? (
+            <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-1.5">
-                {PRESET_WORD_COUNTS.map(cnt => (
+                {[50, 100, 150, 200, 300, 500].map((count) => (
                   <button
-                    key={cnt}
+                    key={count}
                     type="button"
                     onClick={() => {
-                      setSelectedWordCount(cnt);
-                      setCustomWordInput(cnt.toString());
+                      setSelectedWordLimit(count);
+                      setCustomWordLimitInput(count.toString());
                     }}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      customWordInput === cnt.toString()
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      selectedWordLimit === count && customWordLimitInput === count.toString()
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
-                    {cnt} words
+                    {count}w
                   </button>
                 ))}
               </div>
 
-              {/* Custom Number Input */}
               <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Custom:</span>
+                <span className="text-xs text-slate-500 font-medium">Custom Words:</span>
                 <input
                   type="number"
                   min="5"
                   max="5000"
-                  value={customWordInput}
-                  onChange={(e) => setCustomWordInput(e.target.value)}
-                  placeholder="e.g. 275"
-                  className="w-28 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={customWordLimitInput}
+                  onChange={(e) => {
+                    setCustomWordLimitInput(e.target.value);
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) setSelectedWordLimit(val);
+                  }}
+                  className="w-24 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                <span className="text-xs text-slate-400">words</span>
               </div>
+
+              {effectiveWordLimit && effectiveWordLimit > stats.words && stats.words > 0 && (
+                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900 text-[11px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Auto-repetition enabled: Text will loop seamlessly to provide {effectiveWordLimit} words.
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
-            <p className="text-xs text-slate-400 dark:text-slate-500 italic">
-              No word-count limit. The test continues until time runs out or the whole passage is completed.
+            <p className="text-xs text-slate-500 dark:text-slate-400 py-1">
+              Type the full provided text until completion (or until the timer expires).
             </p>
           )}
         </div>
 
-        {/* 2. TIME DURATION CONFIGURATION */}
+        {/* 2. TIME LIMIT CONFIGURATION */}
         <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Time Duration</span>
+              <span>Time Limit</span>
             </span>
 
-            {/* Unlimited vs Custom Selector */}
-            <div className="flex items-center gap-3 text-xs font-medium">
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-                <input
-                  type="radio"
-                  name="timeMode"
-                  disabled={lokSewaMode}
-                  checked={timeMode === 'unlimited' && !lokSewaMode}
-                  onChange={() => setTimeMode('unlimited')}
-                  className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Unlimited</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700 dark:text-slate-300">
-                <input
-                  type="radio"
-                  name="timeMode"
-                  disabled={lokSewaMode}
-                  checked={timeMode === 'custom' || lokSewaMode}
-                  onChange={() => setTimeMode('custom')}
-                  className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Set Time</span>
-              </label>
+            <div className="flex items-center gap-1 p-0.5 bg-slate-200/70 dark:bg-slate-700/70 rounded-lg text-[11px] font-semibold">
+              <button
+                type="button"
+                onClick={() => setTimeLimitMode('unlimited')}
+                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                  timeLimitMode === 'unlimited'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                No Timer
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeLimitMode('limit')}
+                className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                  timeLimitMode === 'limit'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                Fixed Timer
+              </button>
             </div>
           </div>
 
-          {/* Time Presets & Custom Input */}
-          {timeMode === 'custom' || lokSewaMode ? (
-            <div className="space-y-2.5 animate-fadeIn">
+          {timeLimitMode === 'limit' ? (
+            <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-1.5">
-                {PRESET_TIMES.map(t => (
+                {[
+                  { label: '30s', sec: 30 },
+                  { label: '1m', sec: 60 },
+                  { label: '2m', sec: 120 },
+                  { label: '3m', sec: 180 },
+                  { label: '5m', sec: 300 },
+                  { label: '10m', sec: 600 }
+                ].map((item) => (
                   <button
-                    key={t.seconds}
+                    key={item.sec}
                     type="button"
-                    disabled={lokSewaMode}
                     onClick={() => {
-                      setSelectedTimeSeconds(t.seconds);
-                      setCustomMinInput(Math.floor(t.seconds / 60).toString());
-                      setCustomSecInput((t.seconds % 60).toString());
+                      setSelectedTimeLimitSec(item.sec);
+                      const min = Math.floor(item.sec / 60);
+                      const sec = item.sec % 60;
+                      setCustomMinInput(min.toString());
+                      setCustomSecInput(sec.toString());
                     }}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      effectiveTimeLimitSeconds === t.seconds
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      selectedTimeLimitSec === item.sec && effectiveTimeLimitSeconds === item.sec
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                     }`}
                   >
-                    {t.label}
+                    {item.label}
                   </button>
                 ))}
               </div>
 
-              {/* Custom Minutes and Seconds */}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Custom:</span>
+              <div className="flex items-center gap-2 pt-1 text-xs">
+                <span className="text-slate-500 font-medium">Custom:</span>
                 <input
                   type="number"
                   min="0"
-                  max="120"
-                  disabled={lokSewaMode}
+                  max="60"
                   value={customMinInput}
                   onChange={(e) => setCustomMinInput(e.target.value)}
-                  placeholder="Min"
-                  className="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                  className="w-14 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-center text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                <span className="text-xs text-slate-400">m</span>
+                <span className="text-slate-500">m</span>
                 <input
                   type="number"
                   min="0"
                   max="59"
-                  disabled={lokSewaMode}
                   value={customSecInput}
                   onChange={(e) => setCustomSecInput(e.target.value)}
-                  placeholder="Sec"
-                  className="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                  className="w-14 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-center text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                <span className="text-xs text-slate-400">s</span>
+                <span className="text-slate-500">s</span>
               </div>
             </div>
           ) : (
-            <p className="text-xs text-slate-400 dark:text-slate-500 italic">
-              No timer limit. Take all the time you need to complete the text or word target.
+            <p className="text-xs text-slate-500 dark:text-slate-400 py-1">
+              Test runs continuously at your own pace without any countdown timer.
             </p>
           )}
         </div>
-
       </div>
 
-      {/* Active Rule Condition Pill / Summary */}
-      <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 flex items-start gap-2.5 text-xs text-blue-900 dark:text-blue-200">
-        <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-        <div className="space-y-0.5">
-          <span className="font-bold block">
-            {effectiveWordLimit && effectiveTimeLimitSeconds ? (
-              <>Combination Mode: {effectiveWordLimit} words in {Math.floor(effectiveTimeLimitSeconds / 60)}m {effectiveTimeLimitSeconds % 60 ? `${effectiveTimeLimitSeconds % 60}s` : ''}</>
-            ) : effectiveWordLimit ? (
-              <>Word Count Target: {effectiveWordLimit} words (No time limit)</>
-            ) : effectiveTimeLimitSeconds ? (
-              <>Timed Test: {Math.floor(effectiveTimeLimitSeconds / 60)}m {effectiveTimeLimitSeconds % 60 ? `${effectiveTimeLimitSeconds % 60}s` : ''} (No word count limit)</>
-            ) : (
-              <>Untimed Full Passage Mode</>
-            )}
-          </span>
-          <p className="text-blue-700/80 dark:text-blue-300/80 text-[11px] leading-relaxed">
-            {effectiveWordLimit && effectiveTimeLimitSeconds
-              ? `The test ends automatically when either condition is met first: completing ${effectiveWordLimit} words OR when the timer reaches zero.`
-              : effectiveWordLimit
-              ? `The test automatically ends immediately when ${effectiveWordLimit} words have been typed.`
-              : effectiveTimeLimitSeconds
-              ? `The test ends when the timer reaches zero.`
-              : `The test runs continuously until you finish the full passage.`}
-          </p>
-        </div>
-      </div>
-
-      {/* Advanced Rules & Lok Sewa Toggle (Collapsible) */}
-      <div className="pt-2">
+      {/* Expandable Advanced Options */}
+      <div className="border border-slate-200/80 dark:border-slate-800 rounded-xl overflow-hidden">
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+          className="w-full px-4 py-2.5 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-100/60 dark:hover:bg-slate-800/80 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
         >
-          <Sliders className="w-3.5 h-3.5" />
-          <span>{showAdvanced ? 'Hide Additional Test Settings' : 'Configure Rules, Mistakes & Lok Sewa Mode'}</span>
+          <div className="flex items-center gap-2">
+            <Sliders className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Advanced Exam & Typing Rules</span>
+          </div>
+          <span className="text-[11px] text-slate-400">{showAdvanced ? 'Hide ▲' : 'Expand ▼'}</span>
         </button>
 
         {showAdvanced && (
-          <div className="mt-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-3.5 animate-fadeIn">
-            {/* Lok Sewa Toggle */}
-            <div className="flex items-center justify-between">
+          <div className="p-4 bg-white dark:bg-slate-900 space-y-3.5 border-t border-slate-100 dark:border-slate-800 animate-fadeIn text-xs">
+            {/* Lok Sewa Examination Evaluation Toggle */}
+            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 cursor-pointer">
               <div>
-                <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Lok Sewa Aayog (PSC Nepal) Exam Mode</span>
+                <span className="font-bold block text-slate-800 dark:text-slate-200">
+                  Lok Sewa Strict Exam Mode (लोक सेवा मूल्यांकन)
                 </span>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Enforces official 5-minute timer, 200 words evaluation standard, and CWPM formula.
-                </p>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Enforces official Section Officer marking: 5 words per mistake deduction, 5-minute timer.
+                </span>
               </div>
               <input
                 type="checkbox"
                 checked={lokSewaMode}
-                onChange={(e) => {
-                  const enabled = e.target.checked;
-                  setLokSewaMode(enabled);
-                  if (enabled) {
-                    setTimeMode('custom');
-                    setSelectedTimeSeconds(300);
-                  }
-                }}
-                className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
+                onChange={(e) => setLokSewaMode(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
               />
-            </div>
+            </label>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+            {/* Mistake Enforcement Mode */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80">
               <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Mistake Mode</label>
-                <select
-                  value={mistakeMode}
-                  onChange={(e) => setMistakeMode(e.target.value as any)}
-                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium"
-                >
-                  <option value="strict">Strict (Must type correctly)</option>
-                  <option value="allow">Allow (Record mistakes & move on)</option>
-                </select>
+                <span className="font-bold block text-slate-800 dark:text-slate-200">Mistake Enforcement</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Strict stops on wrong keys; Allow permits typing through mistakes.
+                </span>
               </div>
-
-              <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Backspace Key</label>
-                <select
-                  value={backspaceEnabled ? 'yes' : 'no'}
-                  onChange={(e) => setBackspaceEnabled(e.target.value === 'yes')}
-                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium"
+              <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-700/60 p-0.5 rounded-lg text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setMistakeMode('strict')}
+                  className={`px-2.5 py-1 rounded-md cursor-pointer ${
+                    mistakeMode === 'strict'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-bold shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
                 >
-                  <option value="yes">Enabled (Can correct mistakes)</option>
-                  <option value="no">Disabled (Examination restriction)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">Typing Hints</label>
-                <select
-                  value={showHints ? 'yes' : 'no'}
-                  onChange={(e) => setShowHints(e.target.value === 'yes')}
-                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium"
+                  Strict
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMistakeMode('allow')}
+                  className={`px-2.5 py-1 rounded-md cursor-pointer ${
+                    mistakeMode === 'allow'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-bold shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
                 >
-                  <option value="yes">Show Romanized Sequence</option>
-                  <option value="no">Hidden (Blind typing test)</option>
-                </select>
+                  Allow Errors
+                </button>
               </div>
             </div>
+
+            {/* Backspace Toggle */}
+            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 cursor-pointer">
+              <div>
+                <span className="font-bold block text-slate-800 dark:text-slate-200">Enable Backspace Key</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Disable for high-pressure examination stamina drill without corrections.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={backspaceEnabled}
+                onChange={(e) => setBackspaceEnabled(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+              />
+            </label>
+
+            {/* Live Romanized Hints */}
+            <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 cursor-pointer">
+              <div>
+                <span className="font-bold block text-slate-800 dark:text-slate-200">Display Live Keystroke Hints</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Shows the exact Romanized letter sequence for complex Devanagari conjuncts.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={showHints}
+                onChange={(e) => setShowHints(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+              />
+            </label>
           </div>
         )}
       </div>
 
-      {/* Start Button */}
-      <div className="pt-3 flex items-center justify-end gap-3">
+      {/* Start Test Action Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+        <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+          <span>Target:</span>
+          <span className="font-bold text-slate-700 dark:text-slate-200">
+            {effectiveWordLimit ? `${effectiveWordLimit} Words` : `${stats.words} Words (Full Text)`}
+          </span>
+          <span>•</span>
+          <span>Duration:</span>
+          <span className="font-bold text-slate-700 dark:text-slate-200">
+            {effectiveTimeLimitSeconds
+              ? `${Math.floor(effectiveTimeLimitSeconds / 60)}m ${effectiveTimeLimitSeconds % 60 ? `${effectiveTimeLimitSeconds % 60}s` : ''}`
+              : 'Untimed'}
+          </span>
+        </div>
+
         <button
+          id="btn-start-custom-typing"
           type="button"
           onClick={handleStart}
           disabled={!text.trim()}
-          className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full sm:w-auto px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
-          <Play className="w-4 h-4 fill-current" />
+          <Play className="w-4 h-4 fill-white" />
           <span>Start Custom Test</span>
         </button>
       </div>
-
     </div>
   );
 };

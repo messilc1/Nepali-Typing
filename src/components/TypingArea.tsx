@@ -20,6 +20,7 @@ import { playKeypressSound, playErrorSound } from '../utils/soundEffects';
 import { getFontCssValue } from '../utils/fonts';
 import { extractSanitizedWords, areDevanagariWordsEquivalent, isCharacterEquivalent } from '../utils/textNormalizer';
 import { calculateLokSewaEvaluation, ensureLokSewaMinimumWords } from '../utils/lokSewaEvaluation';
+import { expandTextToWordCount, countWords } from '../utils/textRepetition';
 import { LokSewaToggle } from './LokSewaToggle';
 
 interface TypingAreaProps {
@@ -110,8 +111,23 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     if (settings.lokSewaMode) {
       return ensureLokSewaMinimumWords(targetText, 200);
     }
+    // If it is a time-based test, ensure enough words are available without cutting mid-sentence
+    if (settings.testType === 'time' && settings.durationSeconds > 0) {
+      const estimatedWords = Math.max(150, Math.ceil((settings.durationSeconds / 60) * 55));
+      const currentWords = countWords(targetText);
+      if (currentWords < estimatedWords && currentWords > 0) {
+        return expandTextToWordCount(targetText, estimatedWords);
+      }
+    }
+    // If it is a word-limit test and targetText has fewer words, repeat cleanly
+    if (settings.testType === 'words' && settings.wordCount > 0) {
+      const currentWords = countWords(targetText);
+      if (currentWords < settings.wordCount && currentWords > 0) {
+        return expandTextToWordCount(targetText, settings.wordCount);
+      }
+    }
     return targetText;
-  }, [targetText, settings.lokSewaMode]);
+  }, [targetText, settings.lokSewaMode, settings.testType, settings.durationSeconds, settings.wordCount]);
 
   const targetWords = useMemo(() => extractSanitizedWords(effectiveTargetText), [effectiveTargetText]);
 

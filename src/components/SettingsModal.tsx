@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { TestSettings, LanguageMode, DifficultyLevel } from '../types';
 import { FontSelector } from './FontSelector';
+import { playKeypressSound } from '../utils/soundEffects';
 
 interface SettingsModalProps {
   settings: TestSettings;
@@ -157,29 +158,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                     Color Theme
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {[
-                      { id: 'white-blue', label: 'White & Blue', desc: 'Clean, light, high-focus' },
-                      { id: 'dark', label: 'Dark Mode', desc: 'Night mode, deep slate' },
-                      { id: 'high-contrast-blue', label: 'High Contrast', desc: 'Maximum contrast' }
-                    ].map(thm => (
-                      <button
-                        key={thm.id}
-                        type="button"
-                        onClick={() => updateSettings({ theme: thm.id as any })}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                          settings.theme === thm.id
-                            ? 'bg-blue-50/70 dark:bg-blue-950/50 border-blue-600 text-blue-900 dark:text-blue-200'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold">{thm.label}</span>
-                          {settings.theme === thm.id && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
-                        </div>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">{thm.desc}</span>
-                      </button>
-                    ))}
+                      { id: 'dark', label: 'Dark Mode 🌙', desc: 'Night mode, deep slate' },
+                      { id: 'light', label: 'Light Mode ☀️', desc: 'Crisp, high-focus light' },
+                      { id: 'system', label: 'System Default 💻', desc: 'Auto-syncs with OS' },
+                      { id: 'high-contrast-blue', label: 'High Contrast 🔷', desc: 'Maximum accessibility' }
+                    ].map(thm => {
+                      const isSelected = settings.theme === thm.id || (thm.id === 'light' && settings.theme === 'white-blue');
+                      return (
+                        <button
+                          key={thm.id}
+                          type="button"
+                          onClick={() => updateSettings({ theme: thm.id as any })}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-50/70 dark:bg-blue-950/50 border-blue-600 text-blue-900 dark:text-blue-200 ring-2 ring-blue-500/20'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold">{thm.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                          </div>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">{thm.desc}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -281,7 +286,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         key={snd}
                         type="button"
-                        onClick={() => updateSettings({ sound: snd })}
+                        onClick={() => {
+                          updateSettings({ sound: snd });
+                          if (snd !== 'none') {
+                            playKeypressSound(snd, settings.soundVolume ?? 0.5);
+                          }
+                        }}
                         className={`py-2 rounded-lg border text-xs font-bold capitalize transition-all text-center cursor-pointer ${
                           settings.sound === snd
                             ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'

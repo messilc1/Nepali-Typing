@@ -79,6 +79,7 @@ export interface CertificationAttempt {
 export type TestType = 'time' | 'words' | 'custom' | 'paragraph' | 'legal' | 'quote';
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'expert';
+export type ThemeType = 'dark' | 'light' | 'white-blue' | 'system' | 'high-contrast-blue';
 
 export interface TestSettings {
   language: LanguageMode;
@@ -90,7 +91,7 @@ export interface TestSettings {
   legalCategory?: string;
   fontSize: 'sm' | 'md' | 'lg' | 'xl';
   fontFamily: 'Kalimati' | 'Noto Sans Devanagari' | 'Noto Serif Devanagari' | 'Mukta' | 'Kokila' | 'Mangal' | 'Aparajita' | 'Tiro Devanagari' | 'Plus Jakarta Sans' | string;
-  theme: 'white-blue' | 'dark' | 'high-contrast-blue';
+  theme: ThemeType;
   sound: 'none' | 'click' | 'mechanical' | 'typewriter';
   soundVolume: number;
   showLiveWpm: boolean;

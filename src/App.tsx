@@ -225,14 +225,30 @@ export default function App() {
     }
   }, [settings.fontFamily]);
 
-  // Apply Theme Classes
+  // Apply Theme Classes & System Theme Listener
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove('dark', 'high-contrast-blue');
-    if (settings.theme === 'dark') {
-      root.classList.add('dark');
-    } else if (settings.theme === 'high-contrast-blue') {
-      root.classList.add('high-contrast-blue');
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const applyTheme = () => {
+      root.classList.remove('dark', 'high-contrast-blue');
+      if (settings.theme === 'dark') {
+        root.classList.add('dark');
+      } else if (settings.theme === 'high-contrast-blue') {
+        root.classList.add('high-contrast-blue');
+      } else if (settings.theme === 'system') {
+        if (mediaQuery.matches) {
+          root.classList.add('dark');
+        }
+      }
+      // 'light' is default (neither dark nor high-contrast-blue class)
+    };
+
+    applyTheme();
+
+    if (settings.theme === 'system') {
+      mediaQuery.addEventListener('change', applyTheme);
+      return () => mediaQuery.removeEventListener('change', applyTheme);
     }
   }, [settings.theme]);
 

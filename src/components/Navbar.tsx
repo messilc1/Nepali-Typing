@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { NavigationTab, TestSettings, UserStats } from '../types';
 import { FontSelector } from './FontSelector';
+import { ThemeSelector } from './ThemeSelector';
 import { BrandLogo } from './BrandLogo';
 
 interface NavbarProps {
@@ -104,8 +105,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>{userStats.currentStreakDays}d streak</span>
             </div>
 
+            {/* Theme Selector Component */}
+            <div className="shrink-0">
+              <ThemeSelector
+                currentTheme={settings.theme}
+                onSelectTheme={(theme) => updateSettings({ theme })}
+                compact={true}
+              />
+            </div>
+
             {/* Font Selector Dropdown */}
-            <div className="shrink-0 max-w-[130px] sm:max-w-none">
+            <div className="shrink-0 max-w-[130px] sm:max-w-none hidden sm:block">
               <FontSelector
                 currentFont={settings.fontFamily}
                 onSelectFont={(fontId) => updateSettings({ fontFamily: fontId })}
