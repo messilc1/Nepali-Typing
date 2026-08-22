@@ -26,6 +26,7 @@ import {
 import confetti from 'canvas-confetti';
 import { CertificationUser, CertificationAttempt, CertificationTestScore } from '../types';
 import { transliterateRomanToNepali } from '../utils/nepaliTransliteration';
+import { calculateActualSpeed, calculateErrorSpeed, evaluateCompletedWordsFromChars } from '../utils/wpmCalculator';
 import { OfficialCertificateDocument } from './OfficialCertificateDocument';
 import { ArrowLeft } from 'lucide-react';
 
@@ -280,13 +281,29 @@ export const CertificationView: React.FC<CertificationViewProps> = ({ onBack }) 
     }
 
     const accuracy = Math.round((correctChars / Math.max(1, finalTyped.length)) * 100);
-    const grossWpm = Math.round((finalTyped.length / 5) / (duration / 60));
-    const netWpm = Math.max(0, Math.round(((correctChars - mistakes) / 5) / (duration / 60)));
+    
+    // Evaluate completed words
+    const typedCharObjects = finalTyped.split('').map((c, idx) => ({
+      char: c,
+      isCorrect: idx < target.length && c === target[idx]
+    }));
+    const wordEval = evaluateCompletedWordsFromChars(target, typedCharObjects, true);
+    const totalWords = wordEval.completedWords || finalTyped.trim().split(/\s+/).filter(Boolean).length;
+    const correctWords = wordEval.correctWords;
+    
+    const actualSpeed = calculateActualSpeed(totalWords, duration);
+    const errorSpeed = calculateErrorSpeed(correctWords, duration);
+    const errorFreeSpeed = errorSpeed;
+    const grossWpm = actualSpeed;
+    const netWpm = errorSpeed;
     const consistency = Math.max(60, Math.min(99, Math.round(accuracy - (backspaceCount * 0.5))));
 
     const testScore: CertificationTestScore = {
       testIndex: activeTestIndex,
       testName: getTestTitle(activeTestIndex),
+      actualSpeed,
+      errorSpeed,
+      errorFreeSpeed,
       netWpm,
       grossWpm,
       accuracy,
@@ -294,7 +311,7 @@ export const CertificationView: React.FC<CertificationViewProps> = ({ onBack }) 
       durationSeconds: duration,
       mistakes,
       backspaces: backspaceCount,
-      totalWords: finalTyped.trim().split(/\s+/).length,
+      totalWords,
       totalCharacters: finalTyped.length,
       completedAt: Date.now()
     };

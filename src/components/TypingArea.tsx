@@ -21,6 +21,7 @@ import { getFontCssValue } from '../utils/fonts';
 import { extractSanitizedWords, areDevanagariWordsEquivalent, isCharacterEquivalent } from '../utils/textNormalizer';
 import { calculateLokSewaEvaluation, ensureLokSewaMinimumWords } from '../utils/lokSewaEvaluation';
 import { expandTextToWordCount, countWords } from '../utils/textRepetition';
+import { calculateActualSpeed, calculateErrorSpeed, evaluateCompletedWordsFromWordArrays } from '../utils/wpmCalculator';
 import { LokSewaToggle } from './LokSewaToggle';
 
 interface TypingAreaProps {
@@ -187,10 +188,15 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     });
 
     const totalCharsTyped = correctChars + wrongChars;
-    const minutes = timeSpentSec > 0 ? Math.max(1 / 60, timeSpentSec / 60) : 1 / 60;
+    const completedWordsCount = history.length;
     
-    const grossWpm = start && timeSpentSec > 0 ? Math.round((totalCharsTyped / 5) / minutes) : 0;
-    const netWpm = start && timeSpentSec > 0 ? Math.max(0, Math.round(((correctChars - wrongChars) / 5) / minutes)) : 0;
+    // Actual Speed = Total Completed Words ÷ Time in Minutes
+    // Error Speed = Correctly Completed Words ÷ Time in Minutes
+    const actualSpeed = start && timeSpentSec > 0 ? calculateActualSpeed(completedWordsCount, timeSpentSec) : 0;
+    const errorSpeed = start && timeSpentSec > 0 ? calculateErrorSpeed(correctWords, timeSpentSec) : 0;
+    const errorFreeSpeed = errorSpeed;
+    const netWpm = errorSpeed;
+    const grossWpm = actualSpeed;
     const accuracy = totalCharsTyped > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalCharsTyped) * 100))) : 100;
 
     let remainingSec: number | null = null;
@@ -211,13 +217,16 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     }
 
     return {
+      actualSpeed,
+      errorSpeed,
+      errorFreeSpeed,
       grossWpm,
       netWpm,
       accuracy,
       elapsedSeconds: elapsedSec,
       remainingSeconds: remainingSec,
       totalWords: words.length,
-      completedWordsCount: history.length,
+      completedWordsCount,
       mistakesCount: mistakes,
       backspacesCount: backspaces,
       totalCharactersTyped: totalCharsTyped,
@@ -340,6 +349,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       durationSeconds: settings.durationSeconds,
       elapsedSeconds: liveStats.elapsedSeconds,
       remainingSeconds: liveStats.remainingSeconds,
+      actualSpeed: liveStats.actualSpeed,
+      errorSpeed: liveStats.errorSpeed,
+      errorFreeSpeed: liveStats.errorFreeSpeed,
       grossWpm: liveStats.grossWpm,
       netWpm: liveStats.netWpm,
       accuracy: liveStats.accuracy,
@@ -516,9 +528,14 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     }
 
     const totalTypedChars = correctChars + wrongChars;
-    const minutes = Math.max(1 / 60, timeSpent / 60);
-    const grossWpm = Math.round((totalTypedChars / 5) / minutes);
-    const netWpm = Math.max(0, Math.round(((correctChars - wrongChars) / 5) / minutes));
+    const completedWords = history.length;
+    // ACTUAL SPEED = Total Completed Words ÷ Time in Minutes
+    // ERROR SPEED / ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
+    const actualSpeed = calculateActualSpeed(completedWords, timeSpent);
+    const errorSpeed = calculateErrorSpeed(correctWords, timeSpent);
+    const errorFreeSpeed = errorSpeed;
+    const netWpm = errorSpeed;
+    const grossWpm = actualSpeed;
     const accuracy = totalTypedChars > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalTypedChars) * 100))) : 100;
     
     // Keystroke Accuracy factors in every mistake made before correction
@@ -568,6 +585,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       durationSeconds: settings.durationSeconds,
       elapsedSeconds: timeSpent,
       remainingSeconds: 0,
+      actualSpeed,
+      errorSpeed,
+      errorFreeSpeed,
       grossWpm,
       netWpm,
       accuracy,

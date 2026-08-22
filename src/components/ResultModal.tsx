@@ -13,7 +13,8 @@ import {
   Sparkles,
   ArrowRight,
   Award,
-  BookOpen
+  BookOpen,
+  ShieldCheck
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import confetti from 'canvas-confetti';
@@ -248,40 +249,59 @@ https://nepalitypingpro.app
         </div>
       )}
 
-      {/* Hero Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 mb-8">
+      {/* Hero Stats Grid - Dual Speed & Word-Based Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-8">
         
-        {/* Net WPM */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/30 p-5 rounded-2xl border border-blue-200/80 dark:border-blue-800/80 flex flex-col justify-between">
+        {/* Actual Speed */}
+        <div className="bg-gradient-to-br from-indigo-50 to-blue-50/60 dark:from-indigo-950/40 dark:to-blue-950/30 p-4.5 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/80 flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Net Speed</span>
-            <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Actual Speed</span>
+            <Zap className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div className="my-2">
-            <div className="text-3xl sm:text-4xl font-black text-blue-600 dark:text-blue-300 tracking-tight leading-none">
-              {result.netWpm}
+            <div className="text-3xl sm:text-4xl font-black text-indigo-600 dark:text-indigo-300 tracking-tight leading-none font-mono">
+              {result.actualSpeed ?? result.grossWpm ?? result.netWpm}
             </div>
-            <div className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 mt-1">
-              Words Per Minute
+            <div className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-400 mt-1">
+              WPM (All Completed)
             </div>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-            Gross WPM: <strong>{result.grossWpm}</strong>
+            Formula: {result.totalWordsTyped}w ÷ {(result.elapsedSeconds / 60).toFixed(2)}m
+          </div>
+        </div>
+
+        {/* Error-Free Speed */}
+        <div className="bg-gradient-to-br from-blue-50 to-cyan-50/50 dark:from-blue-950/40 dark:to-cyan-950/30 p-4.5 rounded-2xl border border-blue-200/80 dark:border-blue-800/80 flex flex-col justify-between shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400">Error-Free Speed</span>
+            <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="my-2">
+            <div className="text-3xl sm:text-4xl font-black text-blue-600 dark:text-blue-300 tracking-tight leading-none font-mono">
+              {result.errorFreeSpeed ?? result.errorSpeed ?? result.netWpm}
+            </div>
+            <div className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 mt-1">
+              WPM (Net Speed)
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+            Formula: {result.correctWords} correct ÷ {(result.elapsedSeconds / 60).toFixed(2)}m
           </div>
         </div>
 
         {/* Accuracy */}
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 dark:from-emerald-950/40 dark:to-teal-950/30 p-5 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/80 flex flex-col justify-between">
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 dark:from-emerald-950/40 dark:to-teal-950/30 p-4.5 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/80 flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Accuracy</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Accuracy</span>
             <Target className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="my-2">
-            <div className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-300 tracking-tight leading-none">
+            <div className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-300 tracking-tight leading-none font-mono">
               {result.accuracy}%
             </div>
             <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 mt-1">
-              Typing Accuracy
+              Final Accuracy
             </div>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center justify-between">
@@ -289,61 +309,60 @@ https://nepalitypingpro.app
           </div>
         </div>
 
-        {/* Words Typed */}
-        <div className="bg-gradient-to-br from-purple-50 to-violet-50/50 dark:from-purple-950/40 dark:to-violet-950/30 p-5 rounded-2xl border border-purple-200/80 dark:border-purple-800/80 flex flex-col justify-between">
+        {/* Completed Words */}
+        <div className="bg-gradient-to-br from-purple-50 to-violet-50/50 dark:from-purple-950/40 dark:to-violet-950/30 p-4.5 rounded-2xl border border-purple-200/80 dark:border-purple-800/80 flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Words Typed</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-400">Completed Words</span>
             <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
           <div className="my-2">
-            <div className="text-3xl sm:text-4xl font-black text-purple-600 dark:text-purple-300 tracking-tight leading-none">
+            <div className="text-3xl sm:text-4xl font-black text-purple-600 dark:text-purple-300 tracking-tight leading-none font-mono">
               {result.totalWordsTyped}
             </div>
             <div className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 mt-1">
-              Words Completed
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center justify-between">
-            <span>{result.correctWords} correct • {result.wrongWords} wrong</span>
-          </div>
-        </div>
-
-        {/* Time & Consistency */}
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 dark:from-amber-950/40 dark:to-orange-950/30 p-5 rounded-2xl border border-amber-200/80 dark:border-amber-800/80 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Time & Rhythm</span>
-            <Activity className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div className="my-2">
-            <div className="text-3xl sm:text-4xl font-black text-amber-600 dark:text-amber-300 tracking-tight leading-none">
-              {Math.floor(result.elapsedSeconds / 60)}m {result.elapsedSeconds % 60}s
-            </div>
-            <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 mt-1">
-              Duration Elapsed
+              Total Finished
             </div>
           </div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-            Consistency: <strong>{result.consistencyPercent}%</strong>
+            {result.correctWords} correct • {result.wrongWords} wrong
           </div>
         </div>
 
-        {/* Characters Breakdown */}
-        <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col justify-between col-span-2 lg:col-span-1">
+        {/* Correct vs Incorrect Words Breakdown */}
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 dark:from-amber-950/40 dark:to-orange-950/30 p-4.5 rounded-2xl border border-amber-200/80 dark:border-amber-800/80 flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Characters</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">Word Accuracy</span>
+            <CheckCircle2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div className="my-2">
+            <div className="text-2xl sm:text-3xl font-black text-amber-700 dark:text-amber-300 tracking-tight leading-none font-mono">
+              {result.correctWords} <span className="text-sm font-bold text-slate-400">/ {result.totalWordsTyped}</span>
+            </div>
+            <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 mt-1">
+              Correct Words
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-600 dark:text-slate-300 font-medium flex items-center justify-between">
+            <span>Incorrect Words: <strong className="text-rose-600 dark:text-rose-400">{result.wrongWords}</strong></span>
+          </div>
+        </div>
+
+        {/* Time & Keystrokes */}
+        <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/60 p-4.5 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col justify-between shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300">Time & Keystrokes</span>
             <Clock className="w-4 h-4 text-slate-500" />
           </div>
           <div className="my-2">
-            <div className="text-3xl sm:text-4xl font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none">
-              {result.totalCharactersTyped}
+            <div className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none font-mono">
+              {Math.floor(result.elapsedSeconds / 60)}m {result.elapsedSeconds % 60}s
             </div>
             <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1">
-              Total Keystrokes
+              {result.totalCharactersTyped} Keystrokes
             </div>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-            <span>Correct: <strong className="text-emerald-600 dark:text-emerald-400">{result.correctCharacters}</strong></span>
-            <span>Wrong: <strong className="text-rose-600 dark:text-rose-400">{result.wrongCharacters}</strong></span>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center justify-between">
+            <span>Consistency: <strong>{result.consistencyPercent}%</strong></span>
           </div>
         </div>
 

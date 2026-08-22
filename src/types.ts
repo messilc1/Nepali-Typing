@@ -1,4 +1,7 @@
 export interface LiveStats {
+  actualSpeed: number; // ACTUAL SPEED = Total completed words ÷ Time in Minutes
+  errorSpeed: number; // ERROR SPEED = Correctly completed words ÷ Time in Minutes
+  errorFreeSpeed: number; // ERROR-FREE SPEED (alias for errorSpeed)
   grossWpm: number;
   netWpm: number;
   accuracy: number;
@@ -45,6 +48,9 @@ export interface CertificationUser {
 export interface CertificationTestScore {
   testIndex: number; // 1, 2, 3
   testName: string;
+  actualSpeed?: number;
+  errorSpeed?: number;
+  errorFreeSpeed?: number;
   netWpm: number;
   grossWpm: number;
   accuracy: number;
@@ -171,6 +177,9 @@ export interface TestResult {
   durationSeconds: number;
   elapsedSeconds: number;
   remainingSeconds?: number | null;
+  actualSpeed?: number; // ACTUAL SPEED = Total completed words ÷ Time in Minutes
+  errorSpeed?: number; // ERROR SPEED = Correctly completed words ÷ Time in Minutes
+  errorFreeSpeed?: number; // ERROR-FREE SPEED (alias for errorSpeed)
   grossWpm: number;
   netWpm: number;
   accuracy: number; // 0 - 100 (Final Submitted Text Accuracy)

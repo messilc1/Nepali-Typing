@@ -3,6 +3,9 @@ import { Gauge, Target, Clock, AlertTriangle, Delete, Activity } from 'lucide-re
 import { TestSettings } from '../types';
 
 interface LiveStatsBarProps {
+  actualSpeed?: number;
+  errorSpeed?: number;
+  errorFreeSpeed?: number;
   grossWpm: number;
   netWpm: number;
   accuracy: number;
@@ -16,6 +19,9 @@ interface LiveStatsBarProps {
 }
 
 export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
+  actualSpeed,
+  errorSpeed,
+  errorFreeSpeed,
   grossWpm,
   netWpm,
   accuracy,
@@ -27,6 +33,8 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
   backspacesCount,
   settings
 }) => {
+  const displayActualSpeed = actualSpeed ?? grossWpm;
+  const displayNetSpeed = errorFreeSpeed ?? errorSpeed ?? netWpm;
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
@@ -48,14 +56,26 @@ export const LiveStatsBar: React.FC<LiveStatsBarProps> = ({
     <div id="live-stats-bar" className="w-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs transition-all overflow-hidden">
       <div className="flex flex-wrap items-center divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800/80">
         
-        {/* Net WPM */}
+        {/* Net Speed (Error-Free Speed) */}
         {settings.showLiveWpm && (
           <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Net WPM
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider" title="Error-Free Words Completed per Minute">
+              Error-Free Speed
             </span>
             <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 tabular-nums leading-tight mt-0.5">
-              {netWpm}
+              {displayNetSpeed} <span className="text-xs font-normal text-slate-400">WPM</span>
+            </div>
+          </div>
+        )}
+
+        {/* Actual Speed (All Completed Words) */}
+        {settings.showLiveWpm && (
+          <div className="flex-1 min-w-[110px] px-3 py-3 sm:py-3.5 flex flex-col items-center justify-center text-center">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider" title="Total Words Completed per Minute">
+              Actual Speed
+            </span>
+            <div className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400 tabular-nums leading-tight mt-0.5">
+              {displayActualSpeed} <span className="text-xs font-normal text-slate-400">WPM</span>
             </div>
           </div>
         )}

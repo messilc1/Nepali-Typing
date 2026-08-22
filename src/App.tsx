@@ -188,6 +188,9 @@ export default function App() {
   
   // Realtime Live Stats State
   const [liveStats, setLiveStats] = useState<LiveStats>({
+    actualSpeed: 0,
+    errorSpeed: 0,
+    errorFreeSpeed: 0,
     grossWpm: 0,
     netWpm: 0,
     accuracy: 100,
@@ -487,6 +490,9 @@ export default function App() {
             
             {/* Live Stats Bar */}
             <LiveStatsBar
+              actualSpeed={activeResult ? (activeResult.actualSpeed ?? activeResult.grossWpm) : (liveStats.actualSpeed ?? liveStats.grossWpm)}
+              errorSpeed={activeResult ? (activeResult.errorSpeed ?? activeResult.netWpm) : (liveStats.errorSpeed ?? liveStats.netWpm)}
+              errorFreeSpeed={activeResult ? (activeResult.errorFreeSpeed ?? activeResult.netWpm) : (liveStats.errorFreeSpeed ?? liveStats.netWpm)}
               grossWpm={activeResult ? activeResult.grossWpm : liveStats.grossWpm}
               netWpm={activeResult ? activeResult.netWpm : liveStats.netWpm}
               accuracy={activeResult ? activeResult.accuracy : liveStats.accuracy}
