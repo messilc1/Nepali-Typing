@@ -295,14 +295,16 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     const wrongWords = wordEval.wrongWords;
     
     // ACTUAL SPEED = Completed Words ÷ Time in Minutes
-    // ERROR SPEED / ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
+    // ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
     const actualSpeed = calculateActualSpeed(totalWordsTyped, elapsedSeconds);
     const errorSpeed = calculateErrorSpeed(correctWords, elapsedSeconds);
     const errorFreeSpeed = errorSpeed;
     const grossWpm = actualSpeed;
     const netWpm = errorSpeed;
 
-    const accuracy = totalTyped > 0 ? Math.round((correctCharsCount / totalTyped) * 100) : 100;
+    const wordAccuracy = wordEval.wordAccuracy;
+    const keystrokeAccuracy = totalTyped > 0 ? Math.round((correctCharsCount / totalTyped) * 100) : 100;
+    const accuracy = wordAccuracy;
     const progressPercent = Math.min(100, Math.round((currentIndex / targetChars.length) * 100));
 
     // Lok Sewa live evaluation
@@ -315,11 +317,17 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       grossWpm,
       netWpm,
       accuracy: Math.min(100, Math.max(0, accuracy)),
+      wordAccuracy,
+      keystrokeAccuracy,
+      characterAccuracy: keystrokeAccuracy,
       progressPercent,
       correctCharsCount,
       totalWordsTyped,
+      completedWords: totalWordsTyped,
       wrongWords,
+      incorrectWords: wrongWords,
       correctWords,
+      correctedWords: wordEval.correctedWords,
       lokSewaEval
     };
   }, [elapsedSeconds, typedChars, mistakeCount, currentIndex, targetChars.length, targetText]);
@@ -332,16 +340,19 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
     const duration = Math.max(elapsedSeconds, 1);
     const correctCharsCount = typedChars.filter(c => c.isCorrect).length;
     const totalKeystrokes = typedChars.length + mistakeCount;
-    const accuracy = totalKeystrokes > 0 ? Math.round((correctCharsCount / totalKeystrokes) * 100) : 100;
 
     // Word counts with final completion check
     const wordEval = evaluateCompletedWordsFromChars(targetText, typedChars, true);
     const totalWordsTyped = wordEval.completedWords;
     const correctWords = wordEval.correctWords;
     const wrongWords = wordEval.wrongWords;
+    const correctedWords = wordEval.correctedWords;
+    const wordAccuracy = wordEval.wordAccuracy;
+    const keystrokeAccuracy = totalKeystrokes > 0 ? Math.max(0, Math.round((correctCharsCount / totalKeystrokes) * 100)) : 100;
+    const accuracy = wordAccuracy;
 
     // ACTUAL SPEED = Completed Words ÷ Time in Minutes
-    // ERROR SPEED / ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
+    // ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
     const actualSpeed = calculateActualSpeed(totalWordsTyped, duration);
     const errorSpeed = calculateErrorSpeed(correctWords, duration);
     const errorFreeSpeed = errorSpeed;
@@ -382,15 +393,20 @@ export const EnglishTypingPlayer: React.FC<EnglishTypingPlayerProps> = ({
       netWpm,
       accuracy,
       finalAccuracy: accuracy,
-      keystrokeAccuracy: totalKeystrokes > 0 ? Math.max(0, Math.round(((totalKeystrokes - mistakeCount) / totalKeystrokes) * 100)) : 100,
+      wordAccuracy,
+      keystrokeAccuracy,
+      characterAccuracy: keystrokeAccuracy,
       correctedMistakesCount: backspaceCount,
       uncorrectedMistakesCount: 0,
       totalCharactersTyped: totalKeystrokes,
       correctCharacters: correctCharsCount,
       wrongCharacters: mistakeCount,
       totalWordsTyped,
+      completedWords: totalWordsTyped,
       correctWords,
       wrongWords,
+      incorrectWords: wrongWords,
+      correctedWords,
       mistakesCount: mistakeCount,
       backspacesCount: backspaceCount,
       consistencyPercent: 90,

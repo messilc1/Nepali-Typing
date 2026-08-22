@@ -290,6 +290,12 @@ export const CertificationView: React.FC<CertificationViewProps> = ({ onBack }) 
     const wordEval = evaluateCompletedWordsFromChars(target, typedCharObjects, true);
     const totalWords = wordEval.completedWords || finalTyped.trim().split(/\s+/).filter(Boolean).length;
     const correctWords = wordEval.correctWords;
+    const incorrectWords = wordEval.incorrectWords;
+    const correctedWords = wordEval.correctedWords;
+    const wordAccuracy = wordEval.wordAccuracy;
+    const keystrokeAccuracy = (finalTyped.length + backspaceCount) > 0 
+      ? Math.max(0, Math.min(100, Math.round((correctChars / (finalTyped.length + backspaceCount)) * 100)))
+      : accuracy;
     
     const actualSpeed = calculateActualSpeed(totalWords, duration);
     const errorSpeed = calculateErrorSpeed(correctWords, duration);
@@ -306,12 +312,19 @@ export const CertificationView: React.FC<CertificationViewProps> = ({ onBack }) 
       errorFreeSpeed,
       netWpm,
       grossWpm,
-      accuracy,
+      accuracy: wordAccuracy,
+      wordAccuracy,
+      keystrokeAccuracy,
+      characterAccuracy: keystrokeAccuracy,
       consistency,
       durationSeconds: duration,
       mistakes,
       backspaces: backspaceCount,
       totalWords,
+      completedWords: totalWords,
+      correctWords,
+      incorrectWords,
+      correctedWords,
       totalCharacters: finalTyped.length,
       completedAt: Date.now()
     };

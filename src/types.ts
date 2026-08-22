@@ -5,17 +5,23 @@ export interface LiveStats {
   grossWpm: number;
   netWpm: number;
   accuracy: number;
+  wordAccuracy?: number; // (Correct Words ÷ Completed Words) * 100
+  keystrokeAccuracy?: number; // (Correct Keystrokes ÷ Total Keystrokes) * 100
+  characterAccuracy?: number;
   elapsedSeconds: number;
   remainingSeconds: number | null;
   totalWords: number;
   completedWordsCount: number;
+  completedWords?: number; // Alias for completedWordsCount
+  correctWords: number;
+  wrongWords: number;
+  incorrectWords?: number; // Alias for wrongWords
+  correctedWords?: number; // Words with temporary mistakes corrected with Backspace
   mistakesCount: number;
   backspacesCount: number;
   totalCharactersTyped: number;
   correctCharacters: number;
   wrongCharacters: number;
-  correctWords: number;
-  wrongWords: number;
   consistency: number;
   lokSewaCwpm?: number;
   lokSewaMarks?: number;
@@ -54,11 +60,18 @@ export interface CertificationTestScore {
   netWpm: number;
   grossWpm: number;
   accuracy: number;
+  wordAccuracy?: number;
+  keystrokeAccuracy?: number;
+  characterAccuracy?: number;
   consistency: number;
   durationSeconds: number;
   mistakes: number;
   backspaces: number;
   totalWords: number;
+  completedWords?: number;
+  correctWords?: number;
+  incorrectWords?: number;
+  correctedWords?: number;
   totalCharacters: number;
   completedAt: number;
 }
@@ -191,8 +204,13 @@ export interface TestResult {
   correctCharacters: number;
   wrongCharacters: number;
   totalWordsTyped: number;
+  completedWords?: number; // Alias for totalWordsTyped
   correctWords: number;
   wrongWords: number;
+  incorrectWords?: number; // Alias for wrongWords
+  correctedWords?: number; // Words with temporary mistakes corrected before completion
+  wordAccuracy?: number; // (Correct Words ÷ Completed Words) * 100
+  characterAccuracy?: number; // Keystroke accuracy
   mistakesCount: number;
   backspacesCount: number;
   consistencyPercent: number;

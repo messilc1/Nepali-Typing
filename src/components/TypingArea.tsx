@@ -100,6 +100,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
   const currentWordMistypedSnapshotRef = useRef<string>('');
   const wordErrorsListRef = useRef<DetailedWordError[]>([]);
   const charErrorsListRef = useRef<DetailedCharError[]>([]);
+  const correctedWordIndicesRef = useRef<Set<number>>(new Set());
 
   // DOM Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -189,15 +190,19 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
     const totalCharsTyped = correctChars + wrongChars;
     const completedWordsCount = history.length;
+    const incorrectWords = Math.max(0, completedWordsCount - correctWords);
+    const correctedWords = history.filter((_, idx) => correctedWordIndicesRef.current.has(idx)).length;
+    const wordAccuracy = completedWordsCount > 0 ? Math.min(100, Math.max(0, Math.round((correctWords / completedWordsCount) * 100))) : 100;
+    const keystrokeAccuracy = (totalCharsTyped + mistakes) > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / (totalCharsTyped + mistakes)) * 100))) : 100;
     
-    // Actual Speed = Total Completed Words ÷ Time in Minutes
-    // Error Speed = Correctly Completed Words ÷ Time in Minutes
+    // ACTUAL SPEED = Total Completed Words ÷ Time in Minutes
+    // ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
     const actualSpeed = start && timeSpentSec > 0 ? calculateActualSpeed(completedWordsCount, timeSpentSec) : 0;
     const errorSpeed = start && timeSpentSec > 0 ? calculateErrorSpeed(correctWords, timeSpentSec) : 0;
     const errorFreeSpeed = errorSpeed;
     const netWpm = errorSpeed;
     const grossWpm = actualSpeed;
-    const accuracy = totalCharsTyped > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalCharsTyped) * 100))) : 100;
+    const accuracy = wordAccuracy;
 
     let remainingSec: number | null = null;
     if (
@@ -223,17 +228,23 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       grossWpm,
       netWpm,
       accuracy,
+      wordAccuracy,
+      keystrokeAccuracy,
+      characterAccuracy: keystrokeAccuracy,
       elapsedSeconds: elapsedSec,
       remainingSeconds: remainingSec,
       totalWords: words.length,
       completedWordsCount,
+      completedWords: completedWordsCount,
       mistakesCount: mistakes,
       backspacesCount: backspaces,
       totalCharactersTyped: totalCharsTyped,
       correctCharacters: correctChars,
       wrongCharacters: wrongChars,
       correctWords,
-      wrongWords,
+      wrongWords: incorrectWords,
+      incorrectWords,
+      correctedWords,
       consistency
     };
   }, [targetWords, settings.testType, settings.durationSeconds]);
@@ -431,19 +442,27 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     currentWordMistypedSnapshotRef.current = '';
     wordErrorsListRef.current = [];
     charErrorsListRef.current = [];
+    correctedWordIndicesRef.current.clear();
 
     if (textContainerRef.current) {
       textContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
     }
 
     onLiveStatsChange?.({
+      actualSpeed: 0,
+      errorSpeed: 0,
+      errorFreeSpeed: 0,
       grossWpm: 0,
       netWpm: 0,
       accuracy: 100,
+      wordAccuracy: 100,
+      keystrokeAccuracy: 100,
+      characterAccuracy: 100,
       elapsedSeconds: 0,
       remainingSeconds: ((settings.testType === 'time') || (settings.testType === 'custom' && !settings.noTimeLimit)) && settings.durationSeconds > 0 ? settings.durationSeconds : null,
       totalWords: targetWords.length,
       completedWordsCount: 0,
+      completedWords: 0,
       mistakesCount: 0,
       backspacesCount: 0,
       totalCharactersTyped: 0,
@@ -451,6 +470,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       wrongCharacters: 0,
       correctWords: 0,
       wrongWords: 0,
+      incorrectWords: 0,
+      correctedWords: 0,
       consistency: 100
     });
   }, [targetWords, settings.testType, settings.durationSeconds, onLiveStatsChange]);
@@ -482,12 +503,25 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     const curWordIdx = currentWordIndexRef.current;
     const activeInput = typedInputRef.current;
 
+    // Check if the final word was completed at the end of the text without space
+    let finalCompletedWords = history.length;
+    const isFinalWordMatched = curWordIdx === targetWords.length - 1 && (
+      activeInput === targetWords[curWordIdx] || areDevanagariWordsEquivalent(activeInput, targetWords[curWordIdx])
+    );
+    if (isFinalWordMatched && !history[curWordIdx]) {
+      finalCompletedWords += 1;
+      if (currentWordMistakesRef.current > 0) {
+        correctedWordIndicesRef.current.add(curWordIdx);
+      }
+    }
+
     targetWords.forEach((word, idx) => {
       const typed = history[idx] || (idx === curWordIdx ? activeInput : '');
       if (!typed) return;
 
-      if (typed === word) {
-        if (idx < curWordIdx) {
+      const isExactMatch = typed === word || areDevanagariWordsEquivalent(typed, word);
+      if (isExactMatch) {
+        if (idx < curWordIdx || (idx === curWordIdx && isFinalWordMatched)) {
           correctWords++;
           correctChars += word.length + 1; // +1 for space
         } else {
@@ -510,7 +544,7 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     // If the active word being typed had mistakes and wasn't committed with space yet:
     if (currentWordMistakesRef.current > 0) {
       const activeWord = targetWords[curWordIdx] || '';
-      const isWordCompleted = activeInput === activeWord;
+      const isWordCompleted = activeInput === activeWord || areDevanagariWordsEquivalent(activeInput, activeWord);
       const timeSpentOnWord = currentWordStartTimeRef.current ? (Date.now() - currentWordStartTimeRef.current) : 1000;
       const correctionTime = currentWordErrorStartRef.current ? (Date.now() - currentWordErrorStartRef.current) : 0;
       
@@ -528,21 +562,30 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     }
 
     const totalTypedChars = correctChars + wrongChars;
-    const completedWords = history.length;
+    const completedWords = finalCompletedWords;
+    const incorrectWords = Math.max(0, completedWords - correctWords);
+    const correctedWords = Array.from(correctedWordIndicesRef.current).filter(idx => idx < completedWords).length;
+
     // ACTUAL SPEED = Total Completed Words ÷ Time in Minutes
-    // ERROR SPEED / ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
+    // ERROR-FREE SPEED = Correctly Completed Words ÷ Time in Minutes
     const actualSpeed = calculateActualSpeed(completedWords, timeSpent);
     const errorSpeed = calculateErrorSpeed(correctWords, timeSpent);
     const errorFreeSpeed = errorSpeed;
     const netWpm = errorSpeed;
     const grossWpm = actualSpeed;
-    const accuracy = totalTypedChars > 0 ? Math.min(100, Math.max(0, Math.round((correctChars / totalTypedChars) * 100))) : 100;
     
-    // Keystroke Accuracy factors in every mistake made before correction
+    // Word Accuracy: (Correct Words ÷ Completed Words) * 100
+    const wordAccuracy = completedWords > 0 
+      ? Math.min(100, Math.max(0, Math.round((correctWords / completedWords) * 100))) 
+      : 100;
+    
+    // Keystroke Accuracy: factors in every mistake attempt before correction
     const totalKeystrokeAttempts = totalTypedChars + mistakesCountRef.current;
     const keystrokeAccuracy = totalKeystrokeAttempts > 0 
-      ? Math.max(0, Math.min(100, Math.round((totalTypedChars / totalKeystrokeAttempts) * 100)))
-      : accuracy;
+      ? Math.max(0, Math.min(100, Math.round((correctChars / totalKeystrokeAttempts) * 100)))
+      : (totalTypedChars > 0 ? Math.round((correctChars / totalTypedChars) * 100) : 100);
+
+    const accuracy = wordAccuracy;
 
     const correctedMistakesCount = wordErrorsListRef.current.filter(w => w.corrected).reduce((acc, w) => acc + w.mistakes, 0);
     const uncorrectedMistakesCount = wordErrorsListRef.current.filter(w => !w.corrected).reduce((acc, w) => acc + w.mistakes, 0);
@@ -569,8 +612,8 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
     const isLokSewa = settings.lokSewaMode === true;
     const lokEval = calculateLokSewaEvaluation(
       settings.language,
-      history.length,
-      wrongWords,
+      completedWords,
+      incorrectWords,
       timeSpent
     );
 
@@ -592,7 +635,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       netWpm,
       accuracy,
       finalAccuracy: accuracy,
+      wordAccuracy,
       keystrokeAccuracy,
+      characterAccuracy: keystrokeAccuracy,
       isLokSewaMode: isLokSewa,
       lokSewaCwpm: lokEval.cwpm,
       lokSewaMarks: lokEval.marks,
@@ -602,9 +647,12 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
       totalCharactersTyped: totalTypedChars,
       correctCharacters: correctChars,
       wrongCharacters: wrongChars,
-      totalWordsTyped: history.length,
+      totalWordsTyped: completedWords,
+      completedWords,
       correctWords,
-      wrongWords,
+      wrongWords: incorrectWords,
+      incorrectWords,
+      correctedWords,
       mistakesCount: mistakesCountRef.current,
       backspacesCount: backspacesCountRef.current,
       consistencyPercent: consistency,
@@ -879,6 +927,9 @@ export const TypingArea = forwardRef<TypingAreaRef, TypingAreaProps>(({
 
       // If user made mistakes on this word and corrected it with Backspace, record the DetailedWordError
       if (currentWordMistakesRef.current > 0) {
+        if (isWordCorrect) {
+          correctedWordIndicesRef.current.add(currentWordIndex);
+        }
         const timeSpentOnWord = currentWordStartTimeRef.current ? (Date.now() - currentWordStartTimeRef.current) : 1000;
         const correctionTime = currentWordErrorStartRef.current ? (Date.now() - currentWordErrorStartRef.current) : 0;
         
